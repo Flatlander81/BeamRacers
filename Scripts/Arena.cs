@@ -155,14 +155,15 @@ public partial class Arena : Node2D
 		// Template 5: "Scattered" - Random pillars and walls
 		var scattered = new ArenaTemplate("Scattered", 0.6f);
 		// Add 8 random-ish obstacles (but predetermined for consistency)
-		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(-500, -250), 35));
-		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(450, -200), 40));
-		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(-350, 150), 30));
-		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(300, 250), 35));
-		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-100, -100), 150, Mathf.Pi / 4));
-		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(200, 50), 120, -Mathf.Pi / 6));
+		// Keep within ±400 safe zone to stay in bounds after rotation
+		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(-380, -250), 35));
+		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(350, -200), 40));
+		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(-280, 180), 30));
+		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(280, 280), 35));
+		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-150, -120), 140, Mathf.Pi / 4));
+		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(180, 80), 120, -Mathf.Pi / 6));
 		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(0, 0), 25));
-		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(550, -350), 30));
+		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(380, -320), 30));
 		_templates.Add(scattered);
 
 		GD.Print($"[Arena] ✓ Created {_templates.Count} arena templates");
