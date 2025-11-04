@@ -31,6 +31,8 @@ public partial class Player : CharacterBody2D
 	private const float TRAIL_POINT_DISTANCE = 5.0f;
 	private const float TRAIL_WIDTH = 4.0f;
 	private const float TRAIL_COLLISION_SAFE_DISTANCE = 25.0f; // Don't collide with trail within this radius
+	private const int MAX_TRAIL_POINTS = 500; // Maximum trail points to prevent performance issues
+	private const float TRAIL_CLEANUP_DISTANCE = 1000.0f; // Remove trail points farther than this
 
 	// ========== SHIELD STATE ==========
 	private enum ShieldState { Ready, Active, Cooldown }
@@ -227,14 +229,101 @@ public partial class Player : CharacterBody2D
 
 			if (_distanceSinceLastTrailPoint >= TRAIL_POINT_DISTANCE)
 			{
-				// Spawn trail from center of player for clean 90-degree turns
-				_trailPoints.Add(GlobalPosition);
+				AddTrailPoint(GlobalPosition);
 				_distanceSinceLastTrailPoint = 0.0f;
-
-				// Update trail visual and collision
-				UpdateTrailVisual();
-				UpdateTrailCollision();
 			}
+		}
+
+		// Periodic cleanup
+		CleanupOldTrailPoints();
+	}
+
+	/// <summary>
+	/// Adds a trail point, merging collinear points to reduce trail size
+	/// </summary>
+	private void AddTrailPoint(Vector2 newPoint)
+	{
+		if (_trailPoints.Count == 0)
+		{
+			// First point
+			_trailPoints.Add(newPoint);
+		}
+		else if (_trailPoints.Count == 1)
+		{
+			// Second point
+			_trailPoints.Add(newPoint);
+		}
+		else
+		{
+			// Check if last 3 points are collinear (in a straight line)
+			Vector2 p1 = _trailPoints[_trailPoints.Count - 2];
+			Vector2 p2 = _trailPoints[_trailPoints.Count - 1];
+			Vector2 p3 = newPoint;
+
+			if (ArePointsCollinear(p1, p2, p3))
+			{
+				// Points are in a straight line, replace the middle point
+				_trailPoints[_trailPoints.Count - 1] = newPoint;
+			}
+			else
+			{
+				// Corner detected, add new point
+				_trailPoints.Add(newPoint);
+			}
+		}
+
+		// Update visuals
+		UpdateTrailVisual();
+		UpdateTrailCollision();
+	}
+
+	/// <summary>
+	/// Checks if three points are collinear (in a straight line)
+	/// </summary>
+	private bool ArePointsCollinear(Vector2 p1, Vector2 p2, Vector2 p3)
+	{
+		// Use cross product to check collinearity
+		// If cross product is ~0, points are collinear
+		Vector2 v1 = p2 - p1;
+		Vector2 v2 = p3 - p2;
+
+		float crossProduct = v1.X * v2.Y - v1.Y * v2.X;
+
+		// Allow small threshold for floating point errors
+		return Mathf.Abs(crossProduct) < 0.1f;
+	}
+
+	/// <summary>
+	/// Removes old trail points that are too far away or exceed max count
+	/// </summary>
+	private void CleanupOldTrailPoints()
+	{
+		// Limit total trail points
+		if (_trailPoints.Count > MAX_TRAIL_POINTS)
+		{
+			int pointsToRemove = _trailPoints.Count - MAX_TRAIL_POINTS;
+			_trailPoints.RemoveRange(0, pointsToRemove);
+
+			// Update visuals after cleanup
+			UpdateTrailVisual();
+			UpdateTrailCollision();
+
+			GD.Print($"[Player] Trail cleanup: removed {pointsToRemove} old points");
+		}
+
+		// Also remove points that are very far from player (remove from start of list - oldest points)
+		int removedCount = 0;
+		while (_trailPoints.Count > 0 && _trailPoints[0].DistanceTo(GlobalPosition) > TRAIL_CLEANUP_DISTANCE)
+		{
+			_trailPoints.RemoveAt(0);
+			removedCount++;
+		}
+
+		if (removedCount > 0)
+		{
+			UpdateTrailVisual();
+			UpdateTrailCollision();
+			GD.Print($"[Player] Trail cleanup: removed {removedCount} distant points");
 		}
 	}
 
