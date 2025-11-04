@@ -45,6 +45,7 @@ public partial class Player : CharacterBody2D
 	// ========== TRAIL STATE ==========
 	private List<TrailWall> _walls = new List<TrailWall>(); // All completed walls
 	private Vector2 _currentWallStart = Vector2.Zero; // Start point of wall currently being laid
+	private int _lastWallIndex = -1; // Index of most recent wall - no collision until next turn
 	private const float TRAIL_WIDTH = 4.0f;
 
 	// ========== SHIELD STATE ==========
@@ -242,7 +243,11 @@ public partial class Player : CharacterBody2D
 			{
 				var wall = new TrailWall(_currentWallStart, GlobalPosition);
 				_walls.Add(wall);
-				GD.Print($"[Player] Wall completed: {_currentWallStart} -> {GlobalPosition}");
+
+				// The newly added wall becomes the "last wall" - no collision until next turn
+				_lastWallIndex = _walls.Count - 1;
+
+				GD.Print($"[Player] Wall completed: {_currentWallStart} -> {GlobalPosition} (index {_lastWallIndex}, no collision yet)");
 			}
 
 			// Start new wall at turn point
@@ -407,18 +412,19 @@ public partial class Player : CharacterBody2D
 			}
 		}
 
-		// Create collision shape for each wall
-		foreach (var wall in _walls)
+		// Create collision shape for each wall (except the most recent one)
+		for (int i = 0; i < _walls.Count; i++)
 		{
-			CreateCollisionForWall(wall);
+			// Skip the last wall - player just turned there, collision enabled on next turn
+			if (i == _lastWallIndex)
+			{
+				continue;
+			}
+
+			CreateCollisionForWall(_walls[i]);
 		}
 
-		// Create collision for current wall (don't create collision too close to player)
-		if (_currentWallStart != Vector2.Zero && _currentWallStart.DistanceTo(GlobalPosition) > 25.0f)
-		{
-			var currentWall = new TrailWall(_currentWallStart, GlobalPosition);
-			CreateCollisionForWall(currentWall);
-		}
+		// Don't create collision for current wall being laid (it's behind the player)
 	}
 
 	/// <summary>
@@ -643,6 +649,12 @@ public partial class Player : CharacterBody2D
 		_walls.Insert(hitWallIndex, wall1);
 		_walls.Insert(hitWallIndex + 1, wall2);
 
+		// Update _lastWallIndex if needed (we added an extra wall)
+		if (_lastWallIndex >= hitWallIndex)
+		{
+			_lastWallIndex++; // Shift index forward since we inserted a wall
+		}
+
 		GD.Print($"[Player] Wall broken! Created 30px gap. New walls: [{wall1.Start}->{wall1.End}] and [{wall2.Start}->{wall2.End}]");
 
 		// Update visuals and collision
@@ -726,6 +738,7 @@ public partial class Player : CharacterBody2D
 	{
 		_walls.Clear();
 		_currentWallStart = GlobalPosition;
+		_lastWallIndex = -1; // Reset last wall tracking
 
 		// Clear all trail line visuals
 		foreach (Node child in _trailRenderer.GetChildren())
