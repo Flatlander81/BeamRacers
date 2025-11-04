@@ -29,7 +29,8 @@ public partial class Player : CharacterBody2D
 	private bool _inputEnabled = true;
 
 	// ========== TRAIL STATE ==========
-	private List<Vector2> _trailPoints = new List<Vector2>();
+	private List<List<Vector2>> _trailSegments = new List<List<Vector2>>(); // Trail stored as separate segments
+	private List<Vector2> _currentSegment = new List<Vector2>(); // Current segment being built
 	private float _distanceSinceLastTrailPoint = 0.0f;
 	private const float TRAIL_POINT_DISTANCE = 5.0f;
 	private const float TRAIL_WIDTH = 4.0f;
@@ -318,32 +319,32 @@ public partial class Player : CharacterBody2D
 	/// </summary>
 	private void AddTrailPoint(Vector2 newPoint)
 	{
-		if (_trailPoints.Count == 0)
+		if (_currentSegment.Count == 0)
 		{
-			// First point
-			_trailPoints.Add(newPoint);
+			// First point in current segment
+			_currentSegment.Add(newPoint);
 		}
-		else if (_trailPoints.Count == 1)
+		else if (_currentSegment.Count == 1)
 		{
-			// Second point
-			_trailPoints.Add(newPoint);
+			// Second point in current segment
+			_currentSegment.Add(newPoint);
 		}
 		else
 		{
 			// Check if last 3 points are collinear (in a straight line)
-			Vector2 p1 = _trailPoints[_trailPoints.Count - 2];
-			Vector2 p2 = _trailPoints[_trailPoints.Count - 1];
+			Vector2 p1 = _currentSegment[_currentSegment.Count - 2];
+			Vector2 p2 = _currentSegment[_currentSegment.Count - 1];
 			Vector2 p3 = newPoint;
 
 			if (ArePointsCollinear(p1, p2, p3))
 			{
 				// Points are in a straight line, replace the middle point
-				_trailPoints[_trailPoints.Count - 1] = newPoint;
+				_currentSegment[_currentSegment.Count - 1] = newPoint;
 			}
 			else
 			{
 				// Corner detected, add new point
-				_trailPoints.Add(newPoint);
+				_currentSegment.Add(newPoint);
 			}
 		}
 
@@ -373,49 +374,34 @@ public partial class Player : CharacterBody2D
 	/// </summary>
 	private void UpdateTrailVisual()
 	{
-		// Clear all existing trail line segments
+		// Clear all existing trail line segments - collect first to avoid modification during iteration
+		var childrenToRemove = new List<Node>();
 		foreach (Node child in _trailRenderer.GetChildren())
 		{
 			if (child is Line2D)
 			{
-				child.QueueFree();
+				childrenToRemove.Add(child);
+			}
+		}
+		foreach (Node child in childrenToRemove)
+		{
+			_trailRenderer.RemoveChild(child);
+			child.QueueFree();
+		}
+
+		// Render all completed segments
+		foreach (var segment in _trailSegments)
+		{
+			if (segment.Count >= 2)
+			{
+				CreateTrailSegment(segment);
 			}
 		}
 
-		if (_trailPoints.Count < 2)
-			return;
-
-		// Create separate Line2D segments whenever there's a gap
-		const float GAP_DETECTION_THRESHOLD = 20.0f; // Points > 20 pixels apart indicate a gap
-
-		List<Vector2> currentSegment = new List<Vector2>();
-		currentSegment.Add(_trailPoints[0]);
-
-		for (int i = 1; i < _trailPoints.Count; i++)
+		// Render current segment being built
+		if (_currentSegment.Count >= 2)
 		{
-			float distance = _trailPoints[i].DistanceTo(_trailPoints[i - 1]);
-
-			if (distance > GAP_DETECTION_THRESHOLD)
-			{
-				// Gap detected - finish current segment and start new one
-				if (currentSegment.Count >= 2)
-				{
-					CreateTrailSegment(currentSegment);
-				}
-				currentSegment.Clear();
-				currentSegment.Add(_trailPoints[i]);
-			}
-			else
-			{
-				// Continue current segment
-				currentSegment.Add(_trailPoints[i]);
-			}
-		}
-
-		// Create final segment
-		if (currentSegment.Count >= 2)
-		{
-			CreateTrailSegment(currentSegment);
+			CreateTrailSegment(_currentSegment);
 		}
 	}
 
@@ -438,11 +424,26 @@ public partial class Player : CharacterBody2D
 	}
 
 	/// <summary>
+	/// Gets all trail points from all segments
+	/// </summary>
+	private List<Vector2> GetAllTrailPoints()
+	{
+		List<Vector2> allPoints = new List<Vector2>();
+		foreach (var segment in _trailSegments)
+		{
+			allPoints.AddRange(segment);
+		}
+		allPoints.AddRange(_currentSegment);
+		return allPoints;
+	}
+
+	/// <summary>
 	/// Updates the trail collision polygon
 	/// </summary>
 	private void UpdateTrailCollision()
 	{
-		if (_trailPoints.Count < 2)
+		var allTrailPoints = GetAllTrailPoints();
+		if (allTrailPoints.Count < 2)
 		{
 			_trailCollisionShape.Polygon = Array.Empty<Vector2>();
 			return;
@@ -451,7 +452,7 @@ public partial class Player : CharacterBody2D
 		// Filter out trail points that are too close to the player
 		// This prevents collision with recently-laid trail during turns
 		List<Vector2> validTrailPoints = new List<Vector2>();
-		foreach (var point in _trailPoints)
+		foreach (var point in allTrailPoints)
 		{
 			if (point.DistanceTo(GlobalPosition) >= TRAIL_COLLISION_SAFE_DISTANCE)
 			{
@@ -610,67 +611,103 @@ public partial class Player : CharacterBody2D
 		const float GAP_SIZE = 30.0f; // Total gap size
 		const float HALF_GAP = GAP_SIZE / 2.0f;
 
-		if (_trailPoints.Count < 2)
-			return;
-
-		// Find the closest segment to the contact point
-		int closestSegmentIndex = -1;
+		// Find the closest line segment across all trail segments
+		int closestSegmentListIndex = -1; // Which segment list (completed or current)
+		int closestPointIndex = -1; // Which point pair within that segment
 		float closestDistance = float.MaxValue;
 		Vector2 closestPointOnSegment = Vector2.Zero;
+		List<Vector2> closestSegment = null;
 
-		for (int i = 0; i < _trailPoints.Count - 1; i++)
+		// Search completed segments
+		for (int segIdx = 0; segIdx < _trailSegments.Count; segIdx++)
 		{
-			Vector2 start = _trailPoints[i];
-			Vector2 end = _trailPoints[i + 1];
+			var segment = _trailSegments[segIdx];
+			for (int i = 0; i < segment.Count - 1; i++)
+			{
+				Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, segment[i], segment[i + 1]);
+				float distance = contactPoint.DistanceTo(pointOnSegment);
 
-			// Find closest point on this segment
-			Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, start, end);
+				if (distance < closestDistance)
+				{
+					closestDistance = distance;
+					closestSegmentListIndex = segIdx;
+					closestPointIndex = i;
+					closestPointOnSegment = pointOnSegment;
+					closestSegment = segment;
+				}
+			}
+		}
+
+		// Search current segment
+		for (int i = 0; i < _currentSegment.Count - 1; i++)
+		{
+			Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, _currentSegment[i], _currentSegment[i + 1]);
 			float distance = contactPoint.DistanceTo(pointOnSegment);
 
 			if (distance < closestDistance)
 			{
 				closestDistance = distance;
-				closestSegmentIndex = i;
+				closestSegmentListIndex = -2; // Special marker for current segment
+				closestPointIndex = i;
 				closestPointOnSegment = pointOnSegment;
+				closestSegment = _currentSegment;
 			}
 		}
 
-		if (closestSegmentIndex == -1 || closestDistance > 50.0f) // Too far from any segment
+		if (closestSegment == null || closestDistance > 50.0f)
 		{
 			GD.Print("[Player] Shield miss - no trail segment nearby");
 			return;
 		}
 
-		// Get the segment direction
-		Vector2 segmentStart = _trailPoints[closestSegmentIndex];
-		Vector2 segmentEnd = _trailPoints[closestSegmentIndex + 1];
-		Vector2 segmentDir = (segmentEnd - segmentStart).Normalized();
-
 		// Calculate gap endpoints
+		Vector2 segmentStart = closestSegment[closestPointIndex];
+		Vector2 segmentEnd = closestSegment[closestPointIndex + 1];
+		Vector2 segmentDir = (segmentEnd - segmentStart).Normalized();
 		Vector2 gapStart = closestPointOnSegment - segmentDir * HALF_GAP;
 		Vector2 gapEnd = closestPointOnSegment + segmentDir * HALF_GAP;
 
-		// Rebuild trail with gap - simple approach
-		List<Vector2> newTrailPoints = new List<Vector2>();
+		// Split the segment at the gap
+		List<Vector2> beforeGap = new List<Vector2>();
+		List<Vector2> afterGap = new List<Vector2>();
 
-		// Add all points up to and including the start of the broken segment
-		for (int i = 0; i <= closestSegmentIndex; i++)
+		// Points before the break
+		for (int i = 0; i <= closestPointIndex; i++)
 		{
-			newTrailPoints.Add(_trailPoints[i]);
+			beforeGap.Add(closestSegment[i]);
+		}
+		beforeGap.Add(gapStart);
+
+		// Points after the break
+		afterGap.Add(gapEnd);
+		for (int i = closestPointIndex + 1; i < closestSegment.Count; i++)
+		{
+			afterGap.Add(closestSegment[i]);
 		}
 
-		// Add gap points
-		newTrailPoints.Add(gapStart);
-		newTrailPoints.Add(gapEnd);
-
-		// Add all points from the end of the broken segment onwards
-		for (int i = closestSegmentIndex + 1; i < _trailPoints.Count; i++)
+		// Update the appropriate segment list
+		if (closestSegmentListIndex == -2)
 		{
-			newTrailPoints.Add(_trailPoints[i]);
+			// Breaking current segment - finish it and start a new one
+			if (beforeGap.Count >= 2)
+			{
+				_trailSegments.Add(beforeGap);
+			}
+			_currentSegment = afterGap;
 		}
-
-		// Update trail points
-		_trailPoints = newTrailPoints;
+		else
+		{
+			// Breaking a completed segment - replace with two segments
+			_trailSegments.RemoveAt(closestSegmentListIndex);
+			if (beforeGap.Count >= 2)
+			{
+				_trailSegments.Insert(closestSegmentListIndex, beforeGap);
+			}
+			if (afterGap.Count >= 2)
+			{
+				_trailSegments.Insert(closestSegmentListIndex + (beforeGap.Count >= 2 ? 1 : 0), afterGap);
+			}
+		}
 
 		// Update visuals and collision
 		UpdateTrailVisual();
@@ -708,7 +745,7 @@ public partial class Player : CharacterBody2D
 		GD.Print("═══════════════════════════════");
 		GD.Print("[Player] PLAYER DEATH");
 		GD.Print($"[Player] Position: {GlobalPosition}");
-		GD.Print($"[Player] Trail points: {_trailPoints.Count}");
+		GD.Print($"[Player] Trail points: {GetAllTrailPoints().Count}");
 		GD.Print("═══════════════════════════════");
 
 		// Stop movement
@@ -753,7 +790,8 @@ public partial class Player : CharacterBody2D
 	/// </summary>
 	public void ClearTrail()
 	{
-		_trailPoints.Clear();
+		_trailSegments.Clear();
+		_currentSegment.Clear();
 		_distanceSinceLastTrailPoint = 0.0f;
 
 		// Clear all trail line segments
@@ -793,6 +831,6 @@ public partial class Player : CharacterBody2D
 			_ => "UNKNOWN"
 		};
 
-		GD.Print($"[Player] Pos: {GlobalPosition:F0} | Dir: {directionName} | Speed: {Velocity.Length():F0} | Trail: {_trailPoints.Count} pts | Shield: {shieldStatus}");
+		GD.Print($"[Player] Pos: {GlobalPosition:F0} | Dir: {directionName} | Speed: {Velocity.Length():F0} | Trail: {GetAllTrailPoints().Count} pts | Shield: {shieldStatus}");
 	}
 }
