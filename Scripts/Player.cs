@@ -365,7 +365,7 @@ public partial class Player : CharacterBody2D
 		}
 
 		// Render current wall being laid
-		if (_currentWallStart != Vector2.Zero)
+		if (_currentWallStart != Vector2.Zero && GlobalPosition != _currentWallStart)
 		{
 			var currentWall = new TrailWall(_currentWallStart, GlobalPosition);
 			CreateWallLine(currentWall);
@@ -377,6 +377,12 @@ public partial class Player : CharacterBody2D
 	/// </summary>
 	private void CreateWallLine(TrailWall wall)
 	{
+		// Don't create zero-length walls
+		if (wall.Start.DistanceTo(wall.End) < 1.0f)
+		{
+			return;
+		}
+
 		var line = new Line2D();
 		line.Points = new Vector2[] { wall.Start, wall.End };
 		line.DefaultColor = new Color(0, 1, 1, 0.8f); // Cyan
