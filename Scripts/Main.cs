@@ -160,15 +160,12 @@ public partial class Main : Node2D
 
 		GD.Print("\n[Main] ▶▶▶ STARTING GAME ◀◀◀");
 
-		// Hide start screen
+		// Hide start screen text (keep background visible)
 		if (_titleLabel != null)
 		{
 			_titleLabel.Visible = false;
 		}
-		if (_background != null)
-		{
-			_background.Visible = false;
-		}
+		// Keep the black background visible during gameplay
 		GD.Print("[Main] ✓ Start screen hidden");
 
 		// Tell GameManager to start a new run
@@ -204,7 +201,7 @@ public partial class Main : Node2D
 		// Create grid lines
 		const int GRID_SIZE = 50;
 		const int GRID_EXTENT = 2000; // How far the grid extends
-		Color gridColor = new Color(0.1f, 0.1f, 0.2f, 1.0f); // Dark blue
+		Color gridColor = new Color(1.0f, 1.0f, 0.0f, 0.3f); // Yellow with transparency
 
 		// Vertical lines
 		for (int x = -GRID_EXTENT; x <= GRID_EXTENT; x += GRID_SIZE)
@@ -228,23 +225,23 @@ public partial class Main : Node2D
 			_gridBackground.AddChild(line);
 		}
 
-		// Add origin marker (brighter)
+		// Add origin marker (brighter yellow)
 		var originLineH = new Line2D();
 		originLineH.AddPoint(new Vector2(-100, 0));
 		originLineH.AddPoint(new Vector2(100, 0));
-		originLineH.DefaultColor = new Color(0.3f, 0.3f, 0.5f, 1.0f);
+		originLineH.DefaultColor = new Color(1.0f, 1.0f, 0.0f, 0.6f);
 		originLineH.Width = 2.0f;
 		_gridBackground.AddChild(originLineH);
 
 		var originLineV = new Line2D();
 		originLineV.AddPoint(new Vector2(0, -100));
 		originLineV.AddPoint(new Vector2(0, 100));
-		originLineV.DefaultColor = new Color(0.3f, 0.3f, 0.5f, 1.0f);
+		originLineV.DefaultColor = new Color(1.0f, 1.0f, 0.0f, 0.6f);
 		originLineV.Width = 2.0f;
 		_gridBackground.AddChild(originLineV);
 
 		_gameLayer.AddChild(_gridBackground);
-		GD.Print("[Main] ✓ Grid background created (50px grid)");
+		GD.Print("[Main] ✓ Grid background created (50px yellow grid on black)");
 	}
 
 	/// <summary>
