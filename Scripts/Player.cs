@@ -97,7 +97,7 @@ public partial class Player : CharacterBody2D
 		// Initialize wall start at player spawn position
 		_currentWallStart = GlobalPosition;
 
-		GD.Print("[Player] ✓ Player initialized");
+		GD.Print($"[Player] ✓ Player initialized at {GlobalPosition}, wall start: {_currentWallStart}");
 	}
 
 	/// <summary>
