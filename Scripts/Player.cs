@@ -31,8 +31,6 @@ public partial class Player : CharacterBody2D
 	private const float TRAIL_POINT_DISTANCE = 5.0f;
 	private const float TRAIL_WIDTH = 4.0f;
 	private const float TRAIL_COLLISION_SAFE_DISTANCE = 25.0f; // Don't collide with trail within this radius
-	private const int MAX_TRAIL_POINTS = 500; // Maximum trail points to prevent performance issues
-	private const float TRAIL_CLEANUP_DISTANCE = 1000.0f; // Remove trail points farther than this
 
 	// ========== SHIELD STATE ==========
 	private enum ShieldState { Ready, Active, Cooldown }
@@ -233,9 +231,6 @@ public partial class Player : CharacterBody2D
 				_distanceSinceLastTrailPoint = 0.0f;
 			}
 		}
-
-		// Periodic cleanup
-		CleanupOldTrailPoints();
 	}
 
 	/// <summary>
@@ -291,40 +286,6 @@ public partial class Player : CharacterBody2D
 
 		// Allow small threshold for floating point errors
 		return Mathf.Abs(crossProduct) < 0.1f;
-	}
-
-	/// <summary>
-	/// Removes old trail points that are too far away or exceed max count
-	/// </summary>
-	private void CleanupOldTrailPoints()
-	{
-		// Limit total trail points
-		if (_trailPoints.Count > MAX_TRAIL_POINTS)
-		{
-			int pointsToRemove = _trailPoints.Count - MAX_TRAIL_POINTS;
-			_trailPoints.RemoveRange(0, pointsToRemove);
-
-			// Update visuals after cleanup
-			UpdateTrailVisual();
-			UpdateTrailCollision();
-
-			GD.Print($"[Player] Trail cleanup: removed {pointsToRemove} old points");
-		}
-
-		// Also remove points that are very far from player (remove from start of list - oldest points)
-		int removedCount = 0;
-		while (_trailPoints.Count > 0 && _trailPoints[0].DistanceTo(GlobalPosition) > TRAIL_CLEANUP_DISTANCE)
-		{
-			_trailPoints.RemoveAt(0);
-			removedCount++;
-		}
-
-		if (removedCount > 0)
-		{
-			UpdateTrailVisual();
-			UpdateTrailCollision();
-			GD.Print($"[Player] Trail cleanup: removed {removedCount} distant points");
-		}
 	}
 
 	/// <summary>
