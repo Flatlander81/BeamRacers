@@ -146,10 +146,10 @@ public partial class Arena : Node2D
 
 		// Template 4: "The Ring" - Inner rectangle forming a donut
 		var theRing = new ArenaTemplate("The Ring", 0.5f);
-		theRing.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-300, -150), 200, 0));  // Top
-		theRing.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-300, 150), 200, 0));   // Bottom
-		theRing.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-300, 0), 300, Mathf.Pi / 2));  // Left
-		theRing.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(300, 0), 300, Mathf.Pi / 2));   // Right
+		theRing.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(0, -150), 400, 0));  // Top
+		theRing.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(0, 150), 400, 0));   // Bottom
+		theRing.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-200, 0), 300, Mathf.Pi / 2));  // Left
+		theRing.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(200, 0), 300, Mathf.Pi / 2));   // Right
 		_templates.Add(theRing);
 
 		// Template 5: "Scattered" - Random pillars and walls
