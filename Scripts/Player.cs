@@ -618,14 +618,22 @@ public partial class Player : CharacterBody2D
 				// Only break trail once per shield activation
 				if (!_shieldBrokeTrailThisActivation)
 				{
-					GD.Print($"[Player] Shield collision detected at {GlobalPosition}");
-					GD.Print($"[Player] Current segments: {_trailSegments.Count}, Current segment points: {_currentSegment.Count}");
+					GD.Print($"[Player] Shield collision detected, raycasting forward to find wall...");
 
-					// Break trail at contact point
-					BreakTrail(GlobalPosition);
-					_shieldBrokeTrailThisActivation = true;
+					// Raycast in forward direction to find actual collision point
+					Vector2 contactPoint = FindWallCollisionPoint();
 
-					GD.Print("[Player] Shield absorbed trail collision!");
+					if (contactPoint != Vector2.Zero)
+					{
+						GD.Print($"[Player] Wall contact point found at {contactPoint}");
+						BreakTrail(contactPoint);
+						_shieldBrokeTrailThisActivation = true;
+						GD.Print("[Player] Shield absorbed trail collision!");
+					}
+					else
+					{
+						GD.Print("[Player] Warning: No wall found by raycast, shield collision may have been edge case");
+					}
 				}
 				// Subsequent collisions during same activation are ignored
 			}
@@ -638,6 +646,38 @@ public partial class Player : CharacterBody2D
 	}
 
 	/// <summary>
+	/// Casts a ray forward to find where the player is about to hit a wall
+	/// </summary>
+	private Vector2 FindWallCollisionPoint()
+	{
+		var spaceState = GetWorld2D().DirectSpaceState;
+		Vector2 forwardDir = GetDirectionVector();
+
+		// Cast a ray from player position forward, looking for trail collision
+		// Check up to 50 pixels ahead
+		var query = PhysicsRayQueryParameters2D.Create(GlobalPosition, GlobalPosition + forwardDir * 50.0f);
+
+		// Only collide with trail collision layer (assuming trail is on layer 2)
+		query.CollideWithAreas = true;
+		query.CollideWithBodies = false;
+		query.Exclude = new Godot.Collections.Array<Rid> { GetRid() }; // Don't hit self
+
+		var result = spaceState.IntersectRay(query);
+
+		if (result.Count > 0)
+		{
+			// Check if we hit the trail collision area
+			var collider = result["collider"].AsGodotObject();
+			if (collider == _trailCollision)
+			{
+				return (Vector2)result["position"];
+			}
+		}
+
+		return Vector2.Zero; // No collision found
+	}
+
+	/// <summary>
 	/// Breaks the trail at a specific contact point by creating a gap
 	/// </summary>
 	private void BreakTrail(Vector2 contactPoint)
@@ -645,12 +685,9 @@ public partial class Player : CharacterBody2D
 		const float GAP_SIZE = 30.0f; // Total gap size
 		const float HALF_GAP = GAP_SIZE / 2.0f;
 
-		GD.Print($"[Player] BreakTrail called at {contactPoint}, searching {_trailSegments.Count} completed segments");
+		GD.Print($"[Player] BreakTrail called at contact point {contactPoint}, searching {_trailSegments.Count} completed segments");
 
-		// Get player's forward direction
-		Vector2 playerForward = GetDirectionVector();
-
-		// Find the closest line segment that is perpendicular to player movement
+		// Find the closest line segment to the actual contact point
 		int closestSegmentListIndex = -1;
 		int closestPointIndex = -1;
 		float closestDistance = float.MaxValue;
@@ -668,18 +705,7 @@ public partial class Player : CharacterBody2D
 				Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, start, end);
 				float distance = contactPoint.DistanceTo(pointOnSegment);
 
-				// Check if this segment is roughly perpendicular to player movement
-				Vector2 dir = (end - start).Normalized();
-				float dotProduct = Mathf.Abs(playerForward.Dot(dir));
-
-				// Dot product near 0 means perpendicular (90 degrees)
-				// Dot product near 1 means parallel (0 or 180 degrees)
-				// We want perpendicular walls, so dot product should be < 0.3 (about 73+ degrees)
-				bool isPerpendicular = dotProduct < 0.3f;
-
-				GD.Print($"[Player] Segment {segIdx}:{i} - distance={distance:F1}, dotProduct={dotProduct:F2}, perpendicular={isPerpendicular}");
-
-				if (distance < closestDistance && isPerpendicular)
+				if (distance < closestDistance)
 				{
 					closestDistance = distance;
 					closestSegmentListIndex = segIdx;
@@ -690,11 +716,11 @@ public partial class Player : CharacterBody2D
 			}
 		}
 
-		GD.Print($"[Player] Closest perpendicular segment found: listIdx={closestSegmentListIndex}, pointIdx={closestPointIndex}, distance={closestDistance:F1}");
+		GD.Print($"[Player] Closest segment to contact point: listIdx={closestSegmentListIndex}, pointIdx={closestPointIndex}, distance={closestDistance:F1}");
 
-		if (closestSegment == null || closestDistance > 50.0f)
+		if (closestSegment == null || closestDistance > 20.0f)
 		{
-			GD.Print($"[Player] Shield miss - no perpendicular trail segment nearby (distance: {closestDistance:F1}, threshold: 50.0)");
+			GD.Print($"[Player] Shield miss - no trail segment at contact point (distance: {closestDistance:F1}, threshold: 20.0)");
 			return;
 		}
 
