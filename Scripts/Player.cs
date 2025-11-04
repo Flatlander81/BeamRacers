@@ -18,8 +18,7 @@ public partial class Player : CharacterBody2D
 	private Line2D _outlineLine;
 	private Polygon2D _shieldVisual;
 	private Node2D _trailRenderer; // Container for trail segments
-	private Area2D _trailCollision;
-	private CollisionPolygon2D _trailCollisionShape;
+	private Area2D _trailCollision; // Container for collision shapes (created dynamically)
 
 	// ========== MOVEMENT STATE ==========
 	public int GridSize = 50; // Set by Main scene
@@ -41,6 +40,7 @@ public partial class Player : CharacterBody2D
 	private ShieldState _shieldState = ShieldState.Ready;
 	private float _shieldTimer = 0.0f;
 	private float _shieldPulseTime = 0.0f;
+	private bool _shieldBrokeTrailThisActivation = false; // Track if we already broke trail this activation
 
 	// ========== DEBUG ==========
 	private int _frameCounter = 0;
@@ -56,13 +56,18 @@ public partial class Player : CharacterBody2D
 		_shieldVisual = GetNode<Polygon2D>("ShieldSystem/ShieldVisual");
 		_trailRenderer = GetNode<Node2D>("TrailRenderer");
 		_trailCollision = GetNode<Area2D>("TrailRenderer/TrailCollision");
-		_trailCollisionShape = GetNode<CollisionPolygon2D>("TrailRenderer/TrailCollision/TrailCollisionShape");
 
-		// Remove the old TrailLine node if it exists (we'll create segments dynamically)
+		// Remove old trail nodes if they exist (we'll create segments dynamically)
 		var oldTrailLine = GetNodeOrNull<Line2D>("TrailRenderer/TrailLine");
 		if (oldTrailLine != null)
 		{
 			oldTrailLine.QueueFree();
+		}
+
+		var oldCollisionShape = GetNodeOrNull<CollisionPolygon2D>("TrailRenderer/TrailCollision/TrailCollisionShape");
+		if (oldCollisionShape != null)
+		{
+			oldCollisionShape.QueueFree();
 		}
 
 		// Move trail renderer to world space so it doesn't move with player
@@ -442,41 +447,56 @@ public partial class Player : CharacterBody2D
 	/// </summary>
 	private void UpdateTrailCollision()
 	{
-		var allTrailPoints = GetAllTrailPoints();
-		if (allTrailPoints.Count < 2)
+		// Clear existing collision shapes
+		foreach (Node child in _trailCollision.GetChildren())
 		{
-			_trailCollisionShape.Polygon = Array.Empty<Vector2>();
-			return;
-		}
-
-		// Filter out trail points that are too close to the player
-		// This prevents collision with recently-laid trail during turns
-		List<Vector2> validTrailPoints = new List<Vector2>();
-		foreach (var point in allTrailPoints)
-		{
-			if (point.DistanceTo(GlobalPosition) >= TRAIL_COLLISION_SAFE_DISTANCE)
+			if (child is CollisionPolygon2D)
 			{
-				validTrailPoints.Add(point);
+				_trailCollision.RemoveChild(child);
+				child.QueueFree();
 			}
 		}
 
-		// Need at least 2 points to make a collision shape
-		if (validTrailPoints.Count < 2)
+		// Create collision shape for each segment
+		foreach (var segment in _trailSegments)
 		{
-			_trailCollisionShape.Polygon = Array.Empty<Vector2>();
-			return;
+			CreateCollisionForSegment(segment);
 		}
 
+		// Create collision for current segment
+		CreateCollisionForSegment(_currentSegment);
+	}
+
+	/// <summary>
+	/// Creates a collision polygon for a single trail segment
+	/// </summary>
+	private void CreateCollisionForSegment(List<Vector2> segment)
+	{
+		if (segment.Count < 2)
+			return;
+
+		// Filter out trail points that are too close to the player
+		List<Vector2> validPoints = new List<Vector2>();
+		foreach (var point in segment)
+		{
+			if (point.DistanceTo(GlobalPosition) >= TRAIL_COLLISION_SAFE_DISTANCE)
+			{
+				validPoints.Add(point);
+			}
+		}
+
+		if (validPoints.Count < 2)
+			return;
+
 		// Create a collision polygon with width around the trail line
-		// Trail points are in global coords, TrailCollision is now at world (0,0)
 		List<Vector2> collisionPoints = new List<Vector2>();
 		float halfWidth = TRAIL_WIDTH / 2.0f;
 
 		// Create offset points on both sides of the trail
-		for (int i = 0; i < validTrailPoints.Count - 1; i++)
+		for (int i = 0; i < validPoints.Count - 1; i++)
 		{
-			Vector2 current = validTrailPoints[i];
-			Vector2 next = validTrailPoints[i + 1];
+			Vector2 current = validPoints[i];
+			Vector2 next = validPoints[i + 1];
 			Vector2 direction = (next - current).Normalized();
 			Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfWidth;
 
@@ -488,27 +508,30 @@ public partial class Player : CharacterBody2D
 		}
 
 		// Add points in reverse for the other side
-		for (int i = validTrailPoints.Count - 1; i >= 0; i--)
+		for (int i = validPoints.Count - 1; i >= 0; i--)
 		{
-			Vector2 point = validTrailPoints[i];
+			Vector2 point = validPoints[i];
 
 			if (i > 0)
 			{
-				Vector2 prev = validTrailPoints[i - 1];
+				Vector2 prev = validPoints[i - 1];
 				Vector2 direction = (point - prev).Normalized();
 				Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfWidth;
 				collisionPoints.Add(point - perpendicular);
 			}
 			else
 			{
-				Vector2 next = validTrailPoints[i + 1];
+				Vector2 next = validPoints[i + 1];
 				Vector2 direction = (next - point).Normalized();
 				Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfWidth;
 				collisionPoints.Add(point - perpendicular);
 			}
 		}
 
-		_trailCollisionShape.Polygon = collisionPoints.ToArray();
+		// Create collision polygon node
+		var collisionShape = new CollisionPolygon2D();
+		collisionShape.Polygon = collisionPoints.ToArray();
+		_trailCollision.AddChild(collisionShape);
 	}
 
 	// ========== SHIELD SYSTEM ==========
@@ -559,6 +582,7 @@ public partial class Player : CharacterBody2D
 		_shieldState = ShieldState.Active;
 		_shieldTimer = 0.0f;
 		_shieldPulseTime = 0.0f;
+		_shieldBrokeTrailThisActivation = false; // Reset break flag
 		_shieldVisual.Visible = true;
 		_shieldVisual.Scale = Vector2.One;
 
@@ -591,12 +615,19 @@ public partial class Player : CharacterBody2D
 
 			if (_shieldState == ShieldState.Active)
 			{
-				GD.Print($"[Player] Shield collision detected at {GlobalPosition}");
-				GD.Print($"[Player] Current segments: {_trailSegments.Count}, Current segment points: {_currentSegment.Count}");
+				// Only break trail once per shield activation
+				if (!_shieldBrokeTrailThisActivation)
+				{
+					GD.Print($"[Player] Shield collision detected at {GlobalPosition}");
+					GD.Print($"[Player] Current segments: {_trailSegments.Count}, Current segment points: {_currentSegment.Count}");
 
-				// Break trail at contact point
-				BreakTrail(GlobalPosition);
-				GD.Print("[Player] Shield absorbed trail collision!");
+					// Break trail at contact point
+					BreakTrail(GlobalPosition);
+					_shieldBrokeTrailThisActivation = true;
+
+					GD.Print("[Player] Shield absorbed trail collision!");
+				}
+				// Subsequent collisions during same activation are ignored
 			}
 			else
 			{
@@ -810,7 +841,14 @@ public partial class Player : CharacterBody2D
 			}
 		}
 
-		_trailCollisionShape.Polygon = Array.Empty<Vector2>();
+		// Clear all collision shapes
+		foreach (Node child in _trailCollision.GetChildren())
+		{
+			if (child is CollisionPolygon2D)
+			{
+				child.QueueFree();
+			}
+		}
 
 		GD.Print("[Player] Trail cleared");
 	}
