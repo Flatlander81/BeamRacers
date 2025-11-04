@@ -22,7 +22,9 @@ public partial class Player : CharacterBody2D
 	private CollisionPolygon2D _trailCollisionShape;
 
 	// ========== MOVEMENT STATE ==========
+	public int GridSize = 50; // Set by Main scene
 	private int _currentDirection = 0; // 0=right, 1=down, 2=left, 3=up
+	private int? _queuedDirection = null; // Queued turn waiting for grid alignment
 	private bool _inputEnabled = true;
 
 	// ========== TRAIL STATE ==========
@@ -168,27 +170,81 @@ public partial class Player : CharacterBody2D
 	}
 
 	/// <summary>
-	/// Processes player movement input - Tron-style 90-degree turns
+	/// Processes player movement input - Grid-snapped Tron-style turns
 	/// </summary>
 	private void ProcessMovement(float delta)
 	{
-		// Handle turning (only when not already turning)
-		if (Input.IsActionJustPressed("move_left"))
+		// Queue turn input
+		if (Input.IsActionJustPressed("move_left") && _queuedDirection == null)
 		{
-			// Turn left (counter-clockwise)
-			_currentDirection = (_currentDirection + 3) % 4; // +3 is same as -1 with wrapping
-			UpdateRotationFromDirection();
+			// Queue turn left (counter-clockwise)
+			_queuedDirection = (_currentDirection + 3) % 4;
 		}
-		else if (Input.IsActionJustPressed("move_right"))
+		else if (Input.IsActionJustPressed("move_right") && _queuedDirection == null)
 		{
-			// Turn right (clockwise)
-			_currentDirection = (_currentDirection + 1) % 4;
+			// Queue turn right (clockwise)
+			_queuedDirection = (_currentDirection + 1) % 4;
+		}
+
+		// Check if we can execute queued turn (grid-aligned)
+		if (_queuedDirection.HasValue && IsAlignedToGrid())
+		{
+			// Snap position to grid
+			SnapToGrid();
+
+			// Execute the turn
+			_currentDirection = _queuedDirection.Value;
+			_queuedDirection = null;
 			UpdateRotationFromDirection();
+
+			GD.Print($"[Player] Turn executed at {GlobalPosition}");
 		}
 
 		// Always move forward in current direction
 		Vector2 moveDirection = GetDirectionVector();
 		Velocity = moveDirection * MoveSpeed;
+	}
+
+	/// <summary>
+	/// Checks if player is aligned to grid for current movement direction
+	/// </summary>
+	private bool IsAlignedToGrid()
+	{
+		// For horizontal movement (Right/Left), Y must be on grid line
+		// For vertical movement (Up/Down), X must be on grid line
+		if (_currentDirection == 0 || _currentDirection == 2) // Right or Left
+		{
+			// Check Y alignment
+			float remainder = Mathf.Abs(GlobalPosition.Y) % GridSize;
+			return remainder < 2.0f || remainder > (GridSize - 2.0f); // Within 2 pixels of grid line
+		}
+		else // Up or Down
+		{
+			// Check X alignment
+			float remainder = Mathf.Abs(GlobalPosition.X) % GridSize;
+			return remainder < 2.0f || remainder > (GridSize - 2.0f);
+		}
+	}
+
+	/// <summary>
+	/// Snaps player position to nearest grid line
+	/// </summary>
+	private void SnapToGrid()
+	{
+		Vector2 snappedPos = GlobalPosition;
+
+		if (_currentDirection == 0 || _currentDirection == 2) // Right or Left
+		{
+			// Snap Y to grid
+			snappedPos.Y = Mathf.Round(snappedPos.Y / GridSize) * GridSize;
+		}
+		else // Up or Down
+		{
+			// Snap X to grid
+			snappedPos.X = Mathf.Round(snappedPos.X / GridSize) * GridSize;
+		}
+
+		GlobalPosition = snappedPos;
 	}
 
 	/// <summary>

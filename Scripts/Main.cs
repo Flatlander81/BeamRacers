@@ -7,6 +7,10 @@ using System;
 /// </summary>
 public partial class Main : Node2D
 {
+	// ========== EXPORTS (editable in Inspector) ==========
+	[Export] public int GridSize = 50;
+	[Export] public int GridExtent = 2000;
+
 	// Scene references
 	private Camera2D _camera;
 	private Node2D _gameLayer;
@@ -222,28 +226,26 @@ public partial class Main : Node2D
 		_gridBackground.Name = "GridBackground";
 		_gridBackground.ZIndex = -100; // Behind everything
 
-		// Create grid lines
-		const int GRID_SIZE = 50;
-		const int GRID_EXTENT = 2000; // How far the grid extends
+		// Create grid lines using exported values
 		Color gridColor = new Color(1.0f, 1.0f, 0.0f, 0.3f); // Yellow with transparency
 
 		// Vertical lines
-		for (int x = -GRID_EXTENT; x <= GRID_EXTENT; x += GRID_SIZE)
+		for (int x = -GridExtent; x <= GridExtent; x += GridSize)
 		{
 			var line = new Line2D();
-			line.AddPoint(new Vector2(x, -GRID_EXTENT));
-			line.AddPoint(new Vector2(x, GRID_EXTENT));
+			line.AddPoint(new Vector2(x, -GridExtent));
+			line.AddPoint(new Vector2(x, GridExtent));
 			line.DefaultColor = gridColor;
 			line.Width = 1.0f;
 			_gridBackground.AddChild(line);
 		}
 
 		// Horizontal lines
-		for (int y = -GRID_EXTENT; y <= GRID_EXTENT; y += GRID_SIZE)
+		for (int y = -GridExtent; y <= GridExtent; y += GridSize)
 		{
 			var line = new Line2D();
-			line.AddPoint(new Vector2(-GRID_EXTENT, y));
-			line.AddPoint(new Vector2(GRID_EXTENT, y));
+			line.AddPoint(new Vector2(-GridExtent, y));
+			line.AddPoint(new Vector2(GridExtent, y));
 			line.DefaultColor = gridColor;
 			line.Width = 1.0f;
 			_gridBackground.AddChild(line);
@@ -265,7 +267,7 @@ public partial class Main : Node2D
 		_gridBackground.AddChild(originLineV);
 
 		_gameLayer.AddChild(_gridBackground);
-		GD.Print("[Main] ✓ Grid background created (50px yellow grid on black)");
+		GD.Print($"[Main] ✓ Grid background created ({GridSize}px yellow grid, extent: {GridExtent})");
 	}
 
 	/// <summary>
@@ -291,6 +293,9 @@ public partial class Main : Node2D
 
 		// Set starting position (center of screen)
 		_player.Position = Vector2.Zero;
+
+		// Set grid size for grid-snapped turning
+		_player.GridSize = GridSize;
 
 		// Add to game layer
 		_gameLayer.AddChild(_player);
