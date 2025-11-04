@@ -560,11 +560,11 @@ public partial class Player : CharacterBody2D
 
 		for (int i = 0; i < _trailPoints.Count - 1; i++)
 		{
-			Vector2 segmentStart = _trailPoints[i];
-			Vector2 segmentEnd = _trailPoints[i + 1];
+			Vector2 start = _trailPoints[i];
+			Vector2 end = _trailPoints[i + 1];
 
 			// Find closest point on this segment
-			Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, segmentStart, segmentEnd);
+			Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, start, end);
 			float distance = contactPoint.DistanceTo(pointOnSegment);
 
 			if (distance < closestDistance)
@@ -618,7 +618,6 @@ public partial class Player : CharacterBody2D
 		newTrailPoints.Add(gapEnd);
 
 		// Add points after the gap
-		bool afterGap = false;
 		for (int i = closestSegmentIndex; i < _trailPoints.Count; i++)
 		{
 			Vector2 point = _trailPoints[i];
@@ -629,7 +628,6 @@ public partial class Player : CharacterBody2D
 
 			if (distToGapEnd > gapEndDist)
 			{
-				afterGap = true;
 				newTrailPoints.Add(point);
 			}
 		}
