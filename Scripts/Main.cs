@@ -27,6 +27,7 @@ public partial class Main : Node2D
 	private bool _gameStarted = false;
 	private GameManager _gameManager;
 	private Player _player;
+	private Arena _arena;
 
 	public override void _Ready()
 	{
@@ -194,6 +195,9 @@ public partial class Main : Node2D
 		// Create grid background
 		CreateGridBackground();
 
+		// Spawn the arena
+		SpawnArena();
+
 		// Spawn the player
 		SpawnPlayer();
 
@@ -328,6 +332,51 @@ public partial class Main : Node2D
 		{
 			// We'll update camera position in _Process
 			GD.Print("[Main] ✓ Camera will follow player");
+		}
+
+		// Set arena bounds for player
+		if (_arena != null)
+		{
+			var bounds = _arena.GetArenaBounds();
+			GD.Print($"[Main] ✓ Arena bounds available: {bounds.Size.X}x{bounds.Size.Y}");
+		}
+	}
+
+	/// <summary>
+	/// Spawns the arena for the current room
+	/// </summary>
+	private void SpawnArena()
+	{
+		// Load the arena scene
+		var arenaScene = GD.Load<PackedScene>("res://Scenes/Arena/Arena.tscn");
+		if (arenaScene == null)
+		{
+			GD.PrintErr("[Main] ERROR: Failed to load Arena scene!");
+			return;
+		}
+
+		// Instantiate the arena
+		_arena = arenaScene.Instantiate<Arena>();
+		if (_arena == null)
+		{
+			GD.PrintErr("[Main] ERROR: Failed to instantiate Arena!");
+			return;
+		}
+
+		// Add to game layer (BEFORE player so it's behind)
+		_gameLayer.AddChild(_arena);
+
+		// Generate arena for current room
+		if (_gameManager != null)
+		{
+			_arena.GenerateArena(_gameManager.CurrentRoom);
+			GD.Print($"[Main] ✓ Arena spawned and generated for room {_gameManager.CurrentRoom}");
+		}
+		else
+		{
+			// Fallback if GameManager not found
+			_arena.GenerateArena(1);
+			GD.Print("[Main] ✓ Arena spawned and generated (default room 1)");
 		}
 	}
 
