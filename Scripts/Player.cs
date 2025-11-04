@@ -543,35 +543,125 @@ public partial class Player : CharacterBody2D
 	}
 
 	/// <summary>
-	/// Breaks the trail at a specific contact point
+	/// Breaks the trail at a specific contact point by creating a gap
 	/// </summary>
 	private void BreakTrail(Vector2 contactPoint)
 	{
-		const float BREAK_RADIUS = 15.0f;
-		int pointsRemoved = 0;
+		const float GAP_SIZE = 30.0f; // Total gap size
+		const float HALF_GAP = GAP_SIZE / 2.0f;
 
-		// Remove trail points within the break radius
-		for (int i = _trailPoints.Count - 1; i >= 0; i--)
+		if (_trailPoints.Count < 2)
+			return;
+
+		// Find the closest segment to the contact point
+		int closestSegmentIndex = -1;
+		float closestDistance = float.MaxValue;
+		Vector2 closestPointOnSegment = Vector2.Zero;
+
+		for (int i = 0; i < _trailPoints.Count - 1; i++)
 		{
-			if (_trailPoints[i].DistanceTo(contactPoint) <= BREAK_RADIUS)
+			Vector2 segmentStart = _trailPoints[i];
+			Vector2 segmentEnd = _trailPoints[i + 1];
+
+			// Find closest point on this segment
+			Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, segmentStart, segmentEnd);
+			float distance = contactPoint.DistanceTo(pointOnSegment);
+
+			if (distance < closestDistance)
 			{
-				_trailPoints.RemoveAt(i);
-				pointsRemoved++;
+				closestDistance = distance;
+				closestSegmentIndex = i;
+				closestPointOnSegment = pointOnSegment;
 			}
 		}
 
-		if (pointsRemoved > 0)
+		if (closestSegmentIndex == -1 || closestDistance > 50.0f) // Too far from any segment
 		{
-			// Update visuals and collision
-			UpdateTrailVisual();
-			UpdateTrailCollision();
-
-			GD.Print($"[Player] Trail broken! Removed {pointsRemoved} points");
-
-			// TODO: Spawn particle effect at contact point
-			// For now, just print
-			GD.Print($"[Player] Trail break effect at {contactPoint}");
+			GD.Print("[Player] Shield miss - no trail segment nearby");
+			return;
 		}
+
+		// Get the segment direction
+		Vector2 segmentStart = _trailPoints[closestSegmentIndex];
+		Vector2 segmentEnd = _trailPoints[closestSegmentIndex + 1];
+		Vector2 segmentDir = (segmentEnd - segmentStart).Normalized();
+
+		// Calculate gap endpoints
+		Vector2 gapStart = closestPointOnSegment - segmentDir * HALF_GAP;
+		Vector2 gapEnd = closestPointOnSegment + segmentDir * HALF_GAP;
+
+		// Rebuild trail with gap
+		List<Vector2> newTrailPoints = new List<Vector2>();
+
+		// Add points before the gap
+		for (int i = 0; i <= closestSegmentIndex; i++)
+		{
+			Vector2 point = _trailPoints[i];
+
+			// Check if this point is before the gap
+			float distToGapStart = (point - segmentStart).Dot(segmentDir);
+			float gapStartDist = (gapStart - segmentStart).Dot(segmentDir);
+
+			if (distToGapStart < gapStartDist)
+			{
+				newTrailPoints.Add(point);
+			}
+			else
+			{
+				// Add the gap start point and stop
+				newTrailPoints.Add(gapStart);
+				break;
+			}
+		}
+
+		// Add the gap end point
+		newTrailPoints.Add(gapEnd);
+
+		// Add points after the gap
+		bool afterGap = false;
+		for (int i = closestSegmentIndex; i < _trailPoints.Count; i++)
+		{
+			Vector2 point = _trailPoints[i];
+
+			// Check if this point is after the gap
+			float distToGapEnd = (point - segmentStart).Dot(segmentDir);
+			float gapEndDist = (gapEnd - segmentStart).Dot(segmentDir);
+
+			if (distToGapEnd > gapEndDist)
+			{
+				afterGap = true;
+				newTrailPoints.Add(point);
+			}
+		}
+
+		// Update trail points
+		_trailPoints = newTrailPoints;
+
+		// Update visuals and collision
+		UpdateTrailVisual();
+		UpdateTrailCollision();
+
+		GD.Print($"[Player] Trail broken! Created {GAP_SIZE}px gap at {closestPointOnSegment}");
+	}
+
+	/// <summary>
+	/// Finds the closest point on a line segment to a given point
+	/// </summary>
+	private Vector2 ClosestPointOnLineSegment(Vector2 point, Vector2 lineStart, Vector2 lineEnd)
+	{
+		Vector2 line = lineEnd - lineStart;
+		float lineLength = line.Length();
+
+		if (lineLength < 0.001f)
+			return lineStart; // Degenerate segment
+
+		Vector2 lineDir = line / lineLength;
+		Vector2 toPoint = point - lineStart;
+
+		float projection = toPoint.Dot(lineDir);
+		projection = Mathf.Clamp(projection, 0, lineLength);
+
+		return lineStart + lineDir * projection;
 	}
 
 	// ========== DEATH HANDLING ==========
