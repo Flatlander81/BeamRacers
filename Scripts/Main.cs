@@ -413,12 +413,22 @@ public partial class Main : Node2D
 			return;
 		}
 
+		if (_arena == null)
+		{
+			GD.PrintErr("[Main] ERROR: Cannot spawn enemies - Arena not found!");
+			return;
+		}
+
+		// Get arena bounds
+		Rect2 arenaBounds = _arena.GetArenaBounds();
+
 		// Spawn enemies for current room
 		_enemySpawner.SpawnEnemies(
 			_gameManager.CurrentRoom,
 			_player.GlobalPosition,
 			_gameLayer,
-			GridExtent
+			arenaBounds,
+			GridSize
 		);
 
 		GD.Print("[Main] ✓ Enemies spawned for current room");

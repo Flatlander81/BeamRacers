@@ -58,8 +58,9 @@ public partial class EnemySpawner : Node
 	/// <param name="roomNumber">Current room number</param>
 	/// <param name="playerPosition">Player's current position</param>
 	/// <param name="container">Node to spawn enemies under</param>
-	/// <param name="arenaExtent">Arena boundary extent (default 2000)</param>
-	public void SpawnEnemies(int roomNumber, Vector2 playerPosition, Node2D container, int arenaExtent = 2000)
+	/// <param name="arenaBounds">Arena boundary rectangle</param>
+	/// <param name="gridSize">Grid size for snapping (default 50)</param>
+	public void SpawnEnemies(int roomNumber, Vector2 playerPosition, Node2D container, Rect2 arenaBounds, int gridSize = 50)
 	{
 		if (_enemyCycleScene == null)
 		{
@@ -74,6 +75,7 @@ public partial class EnemySpawner : Node
 		float enemySpeed = CalculateEnemySpeed(roomNumber);
 
 		GD.Print($"[EnemySpawner] ═══ Spawning {enemyCount} enemies for Room {roomNumber} ═══");
+		GD.Print($"[EnemySpawner] Arena bounds: {arenaBounds}");
 
 		// Track spawn positions to ensure spacing
 		List<Vector2> spawnPositions = new List<Vector2>();
@@ -81,7 +83,7 @@ public partial class EnemySpawner : Node
 		// Spawn each enemy
 		for (int i = 0; i < enemyCount; i++)
 		{
-			Vector2 spawnPos = FindValidSpawnPosition(playerPosition, spawnPositions, arenaExtent);
+			Vector2 spawnPos = FindValidSpawnPosition(playerPosition, spawnPositions, arenaBounds, gridSize);
 
 			if (spawnPos == Vector2.Zero)
 			{
@@ -95,6 +97,8 @@ public partial class EnemySpawner : Node
 			EnemyCycle enemy = _enemyCycleScene.Instantiate<EnemyCycle>();
 			enemy.GlobalPosition = spawnPos;
 			enemy.MaxSpeed = enemySpeed;
+			enemy.GridSize = gridSize;
+			enemy.ArenaBounds = arenaBounds;
 
 			// Connect to death signal
 			enemy.OnEnemyDied += () => OnEnemyDied(enemy);
@@ -194,14 +198,14 @@ public partial class EnemySpawner : Node
 	/// <summary>
 	/// Finds a valid spawn position that meets distance requirements
 	/// </summary>
-	private Vector2 FindValidSpawnPosition(Vector2 playerPosition, List<Vector2> existingPositions, int arenaExtent)
+	private Vector2 FindValidSpawnPosition(Vector2 playerPosition, List<Vector2> existingPositions, Rect2 arenaBounds, int gridSize)
 	{
 		Random random = new Random();
 
 		for (int attempt = 0; attempt < MAX_SPAWN_ATTEMPTS; attempt++)
 		{
 			// Generate random position around arena edges
-			Vector2 candidate = GenerateEdgePosition(arenaExtent, random);
+			Vector2 candidate = GenerateEdgePosition(arenaBounds, gridSize, random);
 
 			// Check distance from player
 			if (candidate.DistanceTo(playerPosition) < MIN_DISTANCE_FROM_PLAYER)
@@ -235,25 +239,35 @@ public partial class EnemySpawner : Node
 	}
 
 	/// <summary>
-	/// Generates a random position around the arena edges
+	/// Generates a random grid-snapped position around the arena edges
 	/// </summary>
-	private Vector2 GenerateEdgePosition(int extent, Random random)
+	private Vector2 GenerateEdgePosition(Rect2 arenaBounds, int gridSize, Random random)
 	{
 		// Choose a random edge (0=top, 1=right, 2=bottom, 3=left)
 		int edge = random.Next(0, 4);
 
 		float margin = 100.0f; // Stay away from absolute edges
-		float minPos = -extent + margin;
-		float maxPos = extent - margin;
 
-		return edge switch
+		// Calculate usable range with margins
+		float minX = arenaBounds.Position.X + margin;
+		float maxX = arenaBounds.Position.X + arenaBounds.Size.X - margin;
+		float minY = arenaBounds.Position.Y + margin;
+		float maxY = arenaBounds.Position.Y + arenaBounds.Size.Y - margin;
+
+		Vector2 position = edge switch
 		{
-			0 => new Vector2((float)random.NextDouble() * (maxPos - minPos) + minPos, -extent + margin), // Top
-			1 => new Vector2(extent - margin, (float)random.NextDouble() * (maxPos - minPos) + minPos),  // Right
-			2 => new Vector2((float)random.NextDouble() * (maxPos - minPos) + minPos, extent - margin),  // Bottom
-			3 => new Vector2(-extent + margin, (float)random.NextDouble() * (maxPos - minPos) + minPos), // Left
+			0 => new Vector2((float)random.NextDouble() * (maxX - minX) + minX, minY), // Top edge
+			1 => new Vector2(maxX, (float)random.NextDouble() * (maxY - minY) + minY), // Right edge
+			2 => new Vector2((float)random.NextDouble() * (maxX - minX) + minX, maxY), // Bottom edge
+			3 => new Vector2(minX, (float)random.NextDouble() * (maxY - minY) + minY), // Left edge
 			_ => Vector2.Zero
 		};
+
+		// Snap to grid
+		position.X = Mathf.Round(position.X / gridSize) * gridSize;
+		position.Y = Mathf.Round(position.Y / gridSize) * gridSize;
+
+		return position;
 	}
 
 	/// <summary>
