@@ -33,6 +33,7 @@ public partial class Player : CharacterBody2D
 	private float _distanceSinceLastTrailPoint = 0.0f;
 	private const float TRAIL_POINT_DISTANCE = 5.0f;
 	private const float TRAIL_WIDTH = 4.0f;
+	private readonly Vector2 TRAIL_SPAWN_OFFSET = new Vector2(-7.5f, 0); // Back center of wedge
 
 	// ========== SHIELD STATE ==========
 	private enum ShieldState { Ready, Active, Cooldown }
@@ -207,7 +208,9 @@ public partial class Player : CharacterBody2D
 
 			if (_distanceSinceLastTrailPoint >= TRAIL_POINT_DISTANCE)
 			{
-				_trailPoints.Add(GlobalPosition);
+				// Calculate trail spawn position at back of wedge
+				Vector2 trailSpawnPos = GlobalPosition + TRAIL_SPAWN_OFFSET.Rotated(Rotation);
+				_trailPoints.Add(trailSpawnPos);
 				_distanceSinceLastTrailPoint = 0.0f;
 
 				// Update trail visual and collision
