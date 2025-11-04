@@ -359,6 +359,30 @@ public partial class Player : CharacterBody2D
 		// Check if it's the player hitting their own trail
 		if (body == this)
 		{
+			// Check if we're actually hitting an old part of the trail
+			// (not just the most recent trail points near our current position)
+			const float SAFE_DISTANCE = 30.0f; // Minimum distance from recent trail
+
+			bool hitOldTrail = false;
+			if (_trailPoints.Count > 5)
+			{
+				// Check trail points, excluding the last few recent ones
+				for (int i = 0; i < _trailPoints.Count - 3; i++)
+				{
+					if (_trailPoints[i].DistanceTo(GlobalPosition) < SAFE_DISTANCE)
+					{
+						hitOldTrail = true;
+						break;
+					}
+				}
+			}
+
+			if (!hitOldTrail)
+			{
+				// We're just hitting our own recent trail, ignore
+				return;
+			}
+
 			if (_shieldState == ShieldState.Active)
 			{
 				// Break trail at contact point

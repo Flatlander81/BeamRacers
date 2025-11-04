@@ -163,8 +163,12 @@ public partial class Main : Node2D
 		if (_titleLabel != null)
 		{
 			_titleLabel.Visible = false;
-			GD.Print("[Main] ✓ Start screen hidden");
 		}
+		if (_background != null)
+		{
+			_background.Visible = false;
+		}
+		GD.Print("[Main] ✓ Start screen hidden");
 
 		// Tell GameManager to start a new run
 		if (_gameManager != null)
