@@ -30,7 +30,7 @@ public partial class Player : CharacterBody2D
 	private float _distanceSinceLastTrailPoint = 0.0f;
 	private const float TRAIL_POINT_DISTANCE = 5.0f;
 	private const float TRAIL_WIDTH = 4.0f;
-	private readonly Vector2 TRAIL_SPAWN_OFFSET = new Vector2(-7.5f, 0); // Back center of wedge
+	private const float TRAIL_COLLISION_SAFE_DISTANCE = 25.0f; // Don't collide with trail within this radius
 
 	// ========== SHIELD STATE ==========
 	private enum ShieldState { Ready, Active, Cooldown }
@@ -227,9 +227,8 @@ public partial class Player : CharacterBody2D
 
 			if (_distanceSinceLastTrailPoint >= TRAIL_POINT_DISTANCE)
 			{
-				// Calculate trail spawn position at back of wedge
-				Vector2 trailSpawnPos = GlobalPosition + TRAIL_SPAWN_OFFSET.Rotated(Rotation);
-				_trailPoints.Add(trailSpawnPos);
+				// Spawn trail from center of player for clean 90-degree turns
+				_trailPoints.Add(GlobalPosition);
 				_distanceSinceLastTrailPoint = 0.0f;
 
 				// Update trail visual and collision
@@ -265,16 +264,34 @@ public partial class Player : CharacterBody2D
 			return;
 		}
 
+		// Filter out trail points that are too close to the player
+		// This prevents collision with recently-laid trail during turns
+		List<Vector2> validTrailPoints = new List<Vector2>();
+		foreach (var point in _trailPoints)
+		{
+			if (point.DistanceTo(GlobalPosition) >= TRAIL_COLLISION_SAFE_DISTANCE)
+			{
+				validTrailPoints.Add(point);
+			}
+		}
+
+		// Need at least 2 points to make a collision shape
+		if (validTrailPoints.Count < 2)
+		{
+			_trailCollisionShape.Polygon = Array.Empty<Vector2>();
+			return;
+		}
+
 		// Create a collision polygon with width around the trail line
 		// Trail points are in global coords, TrailCollision is now at world (0,0)
 		List<Vector2> collisionPoints = new List<Vector2>();
 		float halfWidth = TRAIL_WIDTH / 2.0f;
 
 		// Create offset points on both sides of the trail
-		for (int i = 0; i < _trailPoints.Count - 1; i++)
+		for (int i = 0; i < validTrailPoints.Count - 1; i++)
 		{
-			Vector2 current = _trailPoints[i];
-			Vector2 next = _trailPoints[i + 1];
+			Vector2 current = validTrailPoints[i];
+			Vector2 next = validTrailPoints[i + 1];
 			Vector2 direction = (next - current).Normalized();
 			Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfWidth;
 
@@ -286,20 +303,20 @@ public partial class Player : CharacterBody2D
 		}
 
 		// Add points in reverse for the other side
-		for (int i = _trailPoints.Count - 1; i >= 0; i--)
+		for (int i = validTrailPoints.Count - 1; i >= 0; i--)
 		{
-			Vector2 point = _trailPoints[i];
+			Vector2 point = validTrailPoints[i];
 
 			if (i > 0)
 			{
-				Vector2 prev = _trailPoints[i - 1];
+				Vector2 prev = validTrailPoints[i - 1];
 				Vector2 direction = (point - prev).Normalized();
 				Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfWidth;
 				collisionPoints.Add(point - perpendicular);
 			}
 			else
 			{
-				Vector2 next = _trailPoints[i + 1];
+				Vector2 next = validTrailPoints[i + 1];
 				Vector2 direction = (next - point).Normalized();
 				Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfWidth;
 				collisionPoints.Add(point - perpendicular);
@@ -384,29 +401,8 @@ public partial class Player : CharacterBody2D
 		// Check if it's the player hitting their own trail
 		if (body == this)
 		{
-			// Check if we're actually hitting an old part of the trail
-			// (not just the most recent trail points near our current position)
-			const float SAFE_DISTANCE = 30.0f; // Minimum distance from recent trail
-
-			bool hitOldTrail = false;
-			if (_trailPoints.Count > 5)
-			{
-				// Check trail points, excluding the last few recent ones
-				for (int i = 0; i < _trailPoints.Count - 3; i++)
-				{
-					if (_trailPoints[i].DistanceTo(GlobalPosition) < SAFE_DISTANCE)
-					{
-						hitOldTrail = true;
-						break;
-					}
-				}
-			}
-
-			if (!hitOldTrail)
-			{
-				// We're just hitting our own recent trail, ignore
-				return;
-			}
+			// The collision polygon already excludes nearby trail points
+			// So if we're colliding, it's definitely a real hit
 
 			if (_shieldState == ShieldState.Active)
 			{
