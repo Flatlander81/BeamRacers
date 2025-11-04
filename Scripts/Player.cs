@@ -54,6 +54,14 @@ public partial class Player : CharacterBody2D
 		_trailCollision = GetNode<Area2D>("TrailRenderer/TrailCollision");
 		_trailCollisionShape = GetNode<CollisionPolygon2D>("TrailRenderer/TrailCollision/TrailCollisionShape");
 
+		// Move trail renderer to world space so it doesn't move with player
+		var trailRenderer = GetNode<Node2D>("TrailRenderer");
+		RemoveChild(trailRenderer);
+		GetParent().AddChild(trailRenderer);
+		trailRenderer.GlobalPosition = Vector2.Zero;
+
+		GD.Print("[Player] ✓ Trail renderer moved to world space");
+
 		// Generate visuals
 		GenerateWedgeGeometry();
 		GenerateShieldGeometry();
@@ -238,6 +246,8 @@ public partial class Player : CharacterBody2D
 	{
 		if (_trailPoints.Count > 0)
 		{
+			// Trail points are in global coordinates
+			// TrailLine is now in world space at (0,0), so global coords work directly
 			_trailLine.Points = _trailPoints.ToArray();
 			_trailLine.DefaultColor = new Color(0, 1, 1, 0.8f);
 			_trailLine.Width = TRAIL_WIDTH;
@@ -256,6 +266,7 @@ public partial class Player : CharacterBody2D
 		}
 
 		// Create a collision polygon with width around the trail line
+		// Trail points are in global coords, TrailCollision is now at world (0,0)
 		List<Vector2> collisionPoints = new List<Vector2>();
 		float halfWidth = TRAIL_WIDTH / 2.0f;
 
@@ -269,9 +280,9 @@ public partial class Player : CharacterBody2D
 
 			if (i == 0)
 			{
-				collisionPoints.Add(current + perpendicular - _trailCollision.GlobalPosition);
+				collisionPoints.Add(current + perpendicular);
 			}
-			collisionPoints.Add(next + perpendicular - _trailCollision.GlobalPosition);
+			collisionPoints.Add(next + perpendicular);
 		}
 
 		// Add points in reverse for the other side
@@ -284,14 +295,14 @@ public partial class Player : CharacterBody2D
 				Vector2 prev = _trailPoints[i - 1];
 				Vector2 direction = (point - prev).Normalized();
 				Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfWidth;
-				collisionPoints.Add(point - perpendicular - _trailCollision.GlobalPosition);
+				collisionPoints.Add(point - perpendicular);
 			}
 			else
 			{
 				Vector2 next = _trailPoints[i + 1];
 				Vector2 direction = (next - point).Normalized();
 				Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfWidth;
-				collisionPoints.Add(point - perpendicular - _trailCollision.GlobalPosition);
+				collisionPoints.Add(point - perpendicular);
 			}
 		}
 
