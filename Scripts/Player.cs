@@ -663,14 +663,14 @@ public partial class Player : CharacterBody2D
 			var segment = _trailSegments[segIdx];
 			for (int i = 0; i < segment.Count - 1; i++)
 			{
-				Vector2 segmentStart = segment[i];
-				Vector2 segmentEnd = segment[i + 1];
-				Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, segmentStart, segmentEnd);
+				Vector2 start = segment[i];
+				Vector2 end = segment[i + 1];
+				Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, start, end);
 				float distance = contactPoint.DistanceTo(pointOnSegment);
 
 				// Check if this segment is roughly perpendicular to player movement
-				Vector2 segmentDir = (segmentEnd - segmentStart).Normalized();
-				float dotProduct = Mathf.Abs(playerForward.Dot(segmentDir));
+				Vector2 dir = (end - start).Normalized();
+				float dotProduct = Mathf.Abs(playerForward.Dot(dir));
 
 				// Dot product near 0 means perpendicular (90 degrees)
 				// Dot product near 1 means parallel (0 or 180 degrees)
