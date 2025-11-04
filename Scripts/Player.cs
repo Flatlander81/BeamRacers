@@ -645,25 +645,41 @@ public partial class Player : CharacterBody2D
 		const float GAP_SIZE = 30.0f; // Total gap size
 		const float HALF_GAP = GAP_SIZE / 2.0f;
 
-		GD.Print($"[Player] BreakTrail called at {contactPoint}, searching {_trailSegments.Count} completed segments and current segment with {_currentSegment.Count} points");
+		GD.Print($"[Player] BreakTrail called at {contactPoint}, searching {_trailSegments.Count} completed segments");
 
-		// Find the closest line segment across all trail segments
-		int closestSegmentListIndex = -1; // Which segment list (completed or current)
-		int closestPointIndex = -1; // Which point pair within that segment
+		// Get player's forward direction
+		Vector2 playerForward = GetDirectionVector();
+
+		// Find the closest line segment that is perpendicular to player movement
+		int closestSegmentListIndex = -1;
+		int closestPointIndex = -1;
 		float closestDistance = float.MaxValue;
 		Vector2 closestPointOnSegment = Vector2.Zero;
 		List<Vector2> closestSegment = null;
 
-		// Search completed segments
+		// ONLY search completed segments, never break the current segment being laid
 		for (int segIdx = 0; segIdx < _trailSegments.Count; segIdx++)
 		{
 			var segment = _trailSegments[segIdx];
 			for (int i = 0; i < segment.Count - 1; i++)
 			{
-				Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, segment[i], segment[i + 1]);
+				Vector2 segmentStart = segment[i];
+				Vector2 segmentEnd = segment[i + 1];
+				Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, segmentStart, segmentEnd);
 				float distance = contactPoint.DistanceTo(pointOnSegment);
 
-				if (distance < closestDistance)
+				// Check if this segment is roughly perpendicular to player movement
+				Vector2 segmentDir = (segmentEnd - segmentStart).Normalized();
+				float dotProduct = Mathf.Abs(playerForward.Dot(segmentDir));
+
+				// Dot product near 0 means perpendicular (90 degrees)
+				// Dot product near 1 means parallel (0 or 180 degrees)
+				// We want perpendicular walls, so dot product should be < 0.3 (about 73+ degrees)
+				bool isPerpendicular = dotProduct < 0.3f;
+
+				GD.Print($"[Player] Segment {segIdx}:{i} - distance={distance:F1}, dotProduct={dotProduct:F2}, perpendicular={isPerpendicular}");
+
+				if (distance < closestDistance && isPerpendicular)
 				{
 					closestDistance = distance;
 					closestSegmentListIndex = segIdx;
@@ -674,27 +690,11 @@ public partial class Player : CharacterBody2D
 			}
 		}
 
-		// Search current segment
-		for (int i = 0; i < _currentSegment.Count - 1; i++)
-		{
-			Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, _currentSegment[i], _currentSegment[i + 1]);
-			float distance = contactPoint.DistanceTo(pointOnSegment);
-
-			if (distance < closestDistance)
-			{
-				closestDistance = distance;
-				closestSegmentListIndex = -2; // Special marker for current segment
-				closestPointIndex = i;
-				closestPointOnSegment = pointOnSegment;
-				closestSegment = _currentSegment;
-			}
-		}
-
-		GD.Print($"[Player] Closest segment found: listIdx={closestSegmentListIndex}, pointIdx={closestPointIndex}, distance={closestDistance:F1}");
+		GD.Print($"[Player] Closest perpendicular segment found: listIdx={closestSegmentListIndex}, pointIdx={closestPointIndex}, distance={closestDistance:F1}");
 
 		if (closestSegment == null || closestDistance > 50.0f)
 		{
-			GD.Print($"[Player] Shield miss - no trail segment nearby (distance: {closestDistance:F1}, threshold: 50.0)");
+			GD.Print($"[Player] Shield miss - no perpendicular trail segment nearby (distance: {closestDistance:F1}, threshold: 50.0)");
 			return;
 		}
 
@@ -723,28 +723,15 @@ public partial class Player : CharacterBody2D
 			afterGap.Add(closestSegment[i]);
 		}
 
-		// Update the appropriate segment list
-		if (closestSegmentListIndex == -2)
+		// Breaking a completed segment - replace with two segments
+		_trailSegments.RemoveAt(closestSegmentListIndex);
+		if (beforeGap.Count >= 2)
 		{
-			// Breaking current segment - finish it and start a new one
-			if (beforeGap.Count >= 2)
-			{
-				_trailSegments.Add(beforeGap);
-			}
-			_currentSegment = afterGap;
+			_trailSegments.Insert(closestSegmentListIndex, beforeGap);
 		}
-		else
+		if (afterGap.Count >= 2)
 		{
-			// Breaking a completed segment - replace with two segments
-			_trailSegments.RemoveAt(closestSegmentListIndex);
-			if (beforeGap.Count >= 2)
-			{
-				_trailSegments.Insert(closestSegmentListIndex, beforeGap);
-			}
-			if (afterGap.Count >= 2)
-			{
-				_trailSegments.Insert(closestSegmentListIndex + (beforeGap.Count >= 2 ? 1 : 0), afterGap);
-			}
+			_trailSegments.Insert(closestSegmentListIndex + (beforeGap.Count >= 2 ? 1 : 0), afterGap);
 		}
 
 		// Update visuals and collision
