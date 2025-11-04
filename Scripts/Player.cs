@@ -45,6 +45,7 @@ public partial class Player : CharacterBody2D
 	// ========== TRAIL STATE ==========
 	private List<TrailWall> _walls = new List<TrailWall>(); // All completed walls
 	private Vector2 _currentWallStart = Vector2.Zero; // Start point of wall currently being laid
+	private bool _hasWallStart = false; // Track if we have a valid wall start (needed for origin spawn)
 	private int _lastWallIndex = -1; // Index of most recent wall - no collision until next turn
 	private const float TRAIL_WIDTH = 4.0f;
 
@@ -96,6 +97,7 @@ public partial class Player : CharacterBody2D
 
 		// Initialize wall start at player spawn position
 		_currentWallStart = GlobalPosition;
+		_hasWallStart = true;
 
 		GD.Print($"[Player] ✓ Player initialized at {GlobalPosition}, wall start: {_currentWallStart}");
 	}
@@ -239,7 +241,7 @@ public partial class Player : CharacterBody2D
 			SnapToGrid();
 
 			// Finalize current wall before turning
-			if (_currentWallStart != Vector2.Zero)
+			if (_hasWallStart)
 			{
 				var wall = new TrailWall(_currentWallStart, GlobalPosition);
 				_walls.Add(wall);
@@ -252,6 +254,7 @@ public partial class Player : CharacterBody2D
 
 			// Start new wall at turn point
 			_currentWallStart = GlobalPosition;
+			_hasWallStart = true;
 
 			// Execute the turn
 			_currentDirection = _queuedDirection.Value;
