@@ -405,6 +405,62 @@ public partial class Arena : Node2D
 	}
 
 	/// <summary>
+	/// Generate arena using a specific template by index (for testing/debugging)
+	/// </summary>
+	/// <param name="templateIndex">Template index (0-4): 0=The Box, 1=Four Pillars, 2=The Cross, 3=The Ring, 4=Scattered</param>
+	/// <param name="sizeScale">Scale factor for arena size (default 1.0)</param>
+	public void GenerateArenaByTemplate(int templateIndex, float sizeScale = 1.0f)
+	{
+		// Validate template index
+		if (templateIndex < 0 || templateIndex >= _templates.Count)
+		{
+			GD.PrintErr($"[Arena] ERROR: Invalid template index {templateIndex}. Must be 0-{_templates.Count - 1}");
+			return;
+		}
+
+		GD.Print($"\n[Arena] ═══ GENERATING SPECIFIC ARENA (INDEX {templateIndex}) ═══");
+
+		// Clear existing obstacles
+		ClearObstacles();
+
+		// Get the specific template
+		ArenaTemplate selectedTemplate = _templates[templateIndex];
+		_currentTemplate = selectedTemplate;
+
+		// Apply random rotation (0°, 90°, 180°, 270°)
+		float[] possibleRotations = { 0, Mathf.Pi / 2, Mathf.Pi, 3 * Mathf.Pi / 2 };
+		float arenaRotation = possibleRotations[_random.Next(possibleRotations.Length)];
+
+		// Apply size scale
+		_currentScale = sizeScale;
+		Vector2 scaledSize = _arenaSize * sizeScale;
+
+		// Generate boundaries
+		GenerateBoundaries(scaledSize);
+
+		// Spawn obstacles with rotation
+		foreach (var obstacleDef in selectedTemplate.Obstacles)
+		{
+			// Create a rotated copy of the obstacle
+			var rotatedObstacle = new ObstacleDefinition(
+				obstacleDef.ObstacleType,
+				RotatePoint(obstacleDef.Position, arenaRotation),
+				obstacleDef.Size,
+				obstacleDef.Rotation + arenaRotation
+			);
+			SpawnObstacle(rotatedObstacle);
+		}
+
+		GD.Print($"[Arena] Generated arena: \"{selectedTemplate.Name}\", {selectedTemplate.Obstacles.Count} obstacles");
+		GD.Print($"[Arena] Arena size: {scaledSize.X}x{scaledSize.Y}, scale: {sizeScale:F2}");
+		GD.Print($"[Arena] Rotation: {arenaRotation * 180 / Mathf.Pi:F0}°");
+		GD.Print("[Arena] ═══════════════════════════════════\n");
+
+		// Trigger redraw for grid
+		QueueRedraw();
+	}
+
+	/// <summary>
 	/// Select an arena template based on room difficulty
 	/// </summary>
 	private ArenaTemplate SelectTemplate(int roomNumber)

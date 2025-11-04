@@ -397,6 +397,42 @@ public partial class Main : Node2D
 		{
 			_camera.Position = _player.Position;
 		}
+
+	}
+
+	public override void _Input(InputEvent @event)
+	{
+		// TEST HOTKEYS: F1-F5 to switch arena templates (only during gameplay)
+		if (!_gameStarted || _arena == null)
+			return;
+
+		// Check for F-key presses
+		if (@event is InputEventKey keyEvent && keyEvent.Pressed && !keyEvent.Echo)
+		{
+			switch (keyEvent.Keycode)
+			{
+				case Key.F1:
+					_arena.GenerateArenaByTemplate(0); // The Box
+					GD.Print("[Main] ⚡ F1 pressed - Loading 'The Box' arena");
+					break;
+				case Key.F2:
+					_arena.GenerateArenaByTemplate(1); // Four Pillars
+					GD.Print("[Main] ⚡ F2 pressed - Loading 'Four Pillars' arena");
+					break;
+				case Key.F3:
+					_arena.GenerateArenaByTemplate(2); // The Cross
+					GD.Print("[Main] ⚡ F3 pressed - Loading 'The Cross' arena");
+					break;
+				case Key.F4:
+					_arena.GenerateArenaByTemplate(3); // The Ring
+					GD.Print("[Main] ⚡ F4 pressed - Loading 'The Ring' arena");
+					break;
+				case Key.F5:
+					_arena.GenerateArenaByTemplate(4); // Scattered
+					GD.Print("[Main] ⚡ F5 pressed - Loading 'Scattered' arena");
+					break;
+			}
+		}
 	}
 
 	/// <summary>
