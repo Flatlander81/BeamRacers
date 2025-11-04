@@ -20,6 +20,7 @@ public partial class Main : Node2D
 	// Game state
 	private bool _gameStarted = false;
 	private GameManager _gameManager;
+	private Player _player;
 
 	public override void _Ready()
 	{
@@ -146,19 +147,6 @@ public partial class Main : Node2D
 		GD.Print("[Main] ✓ Title label created (white, 32px, centered)");
 	}
 
-	public override void _Process(double delta)
-	{
-		// Only check for start input if we haven't started yet and we're in main menu
-		if (!_gameStarted && _gameManager != null && _gameManager.CurrentState == GameManager.GameState.MainMenu)
-		{
-			// Check for Space key press (using Godot's input system)
-			if (Input.IsActionJustPressed("ui_accept") || Input.IsKeyPressed(Key.Space))
-			{
-				StartGame();
-			}
-		}
-	}
-
 	/// <summary>
 	/// Initiates the game start sequence
 	/// </summary>
@@ -190,13 +178,66 @@ public partial class Main : Node2D
 			return;
 		}
 
-		// TODO: Later steps will:
-		// - Load the first arena room
-		// - Spawn the player
-		// - Initialize game UI
+		// Spawn the player
+		SpawnPlayer();
 
-		GD.Print("[Main] ✓ Game start sequence complete");
-		GD.Print("[Main] (Note: Arena and player spawning will be added in later steps)\n");
+		GD.Print("[Main] ✓ Game start sequence complete\n");
+	}
+
+	/// <summary>
+	/// Spawns the player in the game world
+	/// </summary>
+	private void SpawnPlayer()
+	{
+		// Load the player scene
+		var playerScene = GD.Load<PackedScene>("res://Scenes/Player/Player.tscn");
+		if (playerScene == null)
+		{
+			GD.PrintErr("[Main] ERROR: Failed to load Player scene!");
+			return;
+		}
+
+		// Instantiate the player
+		_player = playerScene.Instantiate<Player>();
+		if (_player == null)
+		{
+			GD.PrintErr("[Main] ERROR: Failed to instantiate Player!");
+			return;
+		}
+
+		// Set starting position (center of screen)
+		_player.Position = Vector2.Zero;
+
+		// Add to game layer
+		_gameLayer.AddChild(_player);
+
+		GD.Print("[Main] ✓ Player spawned at position (0, 0)");
+
+		// Make camera follow player
+		if (_camera != null)
+		{
+			// We'll update camera position in _Process
+			GD.Print("[Main] ✓ Camera will follow player");
+		}
+	}
+
+	public override void _Process(double delta)
+	{
+		// Only check for start input if we haven't started yet and we're in main menu
+		if (!_gameStarted && _gameManager != null && _gameManager.CurrentState == GameManager.GameState.MainMenu)
+		{
+			// Check for Space key press (using Godot's input system)
+			if (Input.IsActionJustPressed("ui_accept") || Input.IsKeyPressed(Key.Space))
+			{
+				StartGame();
+			}
+		}
+
+		// Update camera to follow player
+		if (_player != null && _camera != null)
+		{
+			_camera.Position = _player.Position;
+		}
 	}
 
 	/// <summary>
