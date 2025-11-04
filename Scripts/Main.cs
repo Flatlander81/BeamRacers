@@ -7,19 +7,26 @@ using System;
 /// </summary>
 public partial class Main : Node2D
 {
+	// ========== EXPORTS (editable in Inspector) ==========
+	[Export] public int GridSize = 50;
+	[Export] public int GridExtent = 2000;
+
 	// Scene references
 	private Camera2D _camera;
 	private Node2D _gameLayer;
 	private CanvasLayer _uiLayer;
 	private Node2D _effectsLayer;
+	private Node2D _gridBackground;
 
 	// UI references
-	private ColorRect _background;
+	private ColorRect _titleBackground;  // Title screen background
+	private ColorRect _gameBackground;   // Game background
 	private Label _titleLabel;
 
 	// Game state
 	private bool _gameStarted = false;
 	private GameManager _gameManager;
+	private Player _player;
 
 	public override void _Ready()
 	{
@@ -118,14 +125,14 @@ public partial class Main : Node2D
 		// Get viewport size for positioning
 		Vector2 viewportSize = GetViewportRect().Size;
 
-		// Create black background
-		_background = new ColorRect();
-		_background.Name = "Background";
-		_background.Color = Colors.Black;
-		_background.Size = viewportSize;
-		_background.Position = Vector2.Zero;
-		_uiLayer.AddChild(_background);
-		GD.Print($"[Main] ✓ Background created (size: {viewportSize})");
+		// Create black background for title screen
+		_titleBackground = new ColorRect();
+		_titleBackground.Name = "TitleBackground";
+		_titleBackground.Color = Colors.Black;
+		_titleBackground.Size = viewportSize;
+		_titleBackground.Position = Vector2.Zero;
+		_uiLayer.AddChild(_titleBackground);
+		GD.Print($"[Main] ✓ Title background created (size: {viewportSize})");
 
 		// Create title label
 		_titleLabel = new Label();
@@ -146,19 +153,6 @@ public partial class Main : Node2D
 		GD.Print("[Main] ✓ Title label created (white, 32px, centered)");
 	}
 
-	public override void _Process(double delta)
-	{
-		// Only check for start input if we haven't started yet and we're in main menu
-		if (!_gameStarted && _gameManager != null && _gameManager.CurrentState == GameManager.GameState.MainMenu)
-		{
-			// Check for Space key press (using Godot's input system)
-			if (Input.IsActionJustPressed("ui_accept") || Input.IsKeyPressed(Key.Space))
-			{
-				StartGame();
-			}
-		}
-	}
-
 	/// <summary>
 	/// Initiates the game start sequence
 	/// </summary>
@@ -171,12 +165,19 @@ public partial class Main : Node2D
 
 		GD.Print("\n[Main] ▶▶▶ STARTING GAME ◀◀◀");
 
-		// Hide start screen
+		// Hide title screen
 		if (_titleLabel != null)
 		{
 			_titleLabel.Visible = false;
-			GD.Print("[Main] ✓ Start screen hidden");
 		}
+		if (_titleBackground != null)
+		{
+			_titleBackground.Visible = false;
+		}
+		GD.Print("[Main] ✓ Start screen hidden");
+
+		// Create game background (in game layer, behind everything)
+		CreateGameBackground();
 
 		// Tell GameManager to start a new run
 		if (_gameManager != null)
@@ -190,13 +191,163 @@ public partial class Main : Node2D
 			return;
 		}
 
-		// TODO: Later steps will:
-		// - Load the first arena room
-		// - Spawn the player
-		// - Initialize game UI
+		// Create grid background
+		CreateGridBackground();
 
-		GD.Print("[Main] ✓ Game start sequence complete");
-		GD.Print("[Main] (Note: Arena and player spawning will be added in later steps)\n");
+		// Spawn the player
+		SpawnPlayer();
+
+		GD.Print("[Main] ✓ Game start sequence complete\n");
+	}
+
+	/// <summary>
+	/// Creates the black background for the game
+	/// </summary>
+	private void CreateGameBackground()
+	{
+		// Create a large black ColorRect that follows the camera
+		_gameBackground = new ColorRect();
+		_gameBackground.Name = "GameBackground";
+		_gameBackground.Color = Colors.Black;
+		_gameBackground.Size = new Vector2(10000, 10000);
+		_gameBackground.Position = new Vector2(-5000, -5000); // Center it
+		_gameBackground.ZIndex = -1000; // Way behind everything
+
+		_gameLayer.AddChild(_gameBackground);
+		GD.Print("[Main] ✓ Game background created (black, 10000x10000)");
+	}
+
+	/// <summary>
+	/// Creates a visual grid background for movement reference
+	/// </summary>
+	private void CreateGridBackground()
+	{
+		_gridBackground = new Node2D();
+		_gridBackground.Name = "GridBackground";
+		_gridBackground.ZIndex = -100; // Behind everything
+
+		// Create grid lines using exported values
+		Color gridColor = new Color(1.0f, 1.0f, 0.0f, 0.3f); // Yellow with transparency
+
+		// Vertical lines
+		for (int x = -GridExtent; x <= GridExtent; x += GridSize)
+		{
+			var line = new Line2D();
+			line.AddPoint(new Vector2(x, -GridExtent));
+			line.AddPoint(new Vector2(x, GridExtent));
+			line.DefaultColor = gridColor;
+			line.Width = 1.0f;
+			_gridBackground.AddChild(line);
+		}
+
+		// Horizontal lines
+		for (int y = -GridExtent; y <= GridExtent; y += GridSize)
+		{
+			var line = new Line2D();
+			line.AddPoint(new Vector2(-GridExtent, y));
+			line.AddPoint(new Vector2(GridExtent, y));
+			line.DefaultColor = gridColor;
+			line.Width = 1.0f;
+			_gridBackground.AddChild(line);
+		}
+
+		// Add bright border lines to mark grid boundaries
+		Color borderColor = new Color(1.0f, 1.0f, 0.0f, 0.8f); // Brighter yellow
+
+		// Top border
+		var borderTop = new Line2D();
+		borderTop.AddPoint(new Vector2(-GridExtent, -GridExtent));
+		borderTop.AddPoint(new Vector2(GridExtent, -GridExtent));
+		borderTop.DefaultColor = borderColor;
+		borderTop.Width = 3.0f;
+		_gridBackground.AddChild(borderTop);
+
+		// Bottom border
+		var borderBottom = new Line2D();
+		borderBottom.AddPoint(new Vector2(-GridExtent, GridExtent));
+		borderBottom.AddPoint(new Vector2(GridExtent, GridExtent));
+		borderBottom.DefaultColor = borderColor;
+		borderBottom.Width = 3.0f;
+		_gridBackground.AddChild(borderBottom);
+
+		// Left border
+		var borderLeft = new Line2D();
+		borderLeft.AddPoint(new Vector2(-GridExtent, -GridExtent));
+		borderLeft.AddPoint(new Vector2(-GridExtent, GridExtent));
+		borderLeft.DefaultColor = borderColor;
+		borderLeft.Width = 3.0f;
+		_gridBackground.AddChild(borderLeft);
+
+		// Right border
+		var borderRight = new Line2D();
+		borderRight.AddPoint(new Vector2(GridExtent, -GridExtent));
+		borderRight.AddPoint(new Vector2(GridExtent, GridExtent));
+		borderRight.DefaultColor = borderColor;
+		borderRight.Width = 3.0f;
+		_gridBackground.AddChild(borderRight);
+
+		_gameLayer.AddChild(_gridBackground);
+		GD.Print($"[Main] ✓ Grid background created ({GridSize}px yellow grid, extent: {GridExtent})");
+	}
+
+	/// <summary>
+	/// Spawns the player in the game world
+	/// </summary>
+	private void SpawnPlayer()
+	{
+		// Load the player scene
+		var playerScene = GD.Load<PackedScene>("res://Scenes/Player/Player.tscn");
+		if (playerScene == null)
+		{
+			GD.PrintErr("[Main] ERROR: Failed to load Player scene!");
+			return;
+		}
+
+		// Instantiate the player
+		_player = playerScene.Instantiate<Player>();
+		if (_player == null)
+		{
+			GD.PrintErr("[Main] ERROR: Failed to instantiate Player!");
+			return;
+		}
+
+		// Set starting position (center of screen)
+		_player.Position = Vector2.Zero;
+
+		// Set grid parameters for grid-snapped turning and boundary detection
+		_player.GridSize = GridSize;
+		_player.GridExtent = GridExtent;
+
+		// Add to game layer
+		_gameLayer.AddChild(_player);
+
+		GD.Print("[Main] ✓ Player spawned at position (0, 0)");
+
+		// Make camera follow player
+		if (_camera != null)
+		{
+			// We'll update camera position in _Process
+			GD.Print("[Main] ✓ Camera will follow player");
+		}
+	}
+
+	public override void _Process(double delta)
+	{
+		// Only check for start input if we haven't started yet and we're in main menu
+		if (!_gameStarted && _gameManager != null && _gameManager.CurrentState == GameManager.GameState.MainMenu)
+		{
+			// Check for Space key press (using Godot's input system)
+			if (Input.IsActionJustPressed("ui_accept") || Input.IsKeyPressed(Key.Space))
+			{
+				StartGame();
+			}
+		}
+
+		// Update camera to follow player
+		if (_player != null && _camera != null)
+		{
+			_camera.Position = _player.Position;
+		}
 	}
 
 	/// <summary>
