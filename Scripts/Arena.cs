@@ -182,53 +182,83 @@ public partial class Arena : Node2D
 
 		float halfWidth = arenaSize.X / 2;
 		float halfHeight = arenaSize.Y / 2;
+		float wallThickness = 10.0f;
 
 		// Top wall
-		var topWall = CreateBoundaryLine(
-			new Vector2(-halfWidth, -halfHeight),
-			new Vector2(halfWidth, -halfHeight)
+		var topWall = CreateBoundaryWall(
+			new Vector2(0, -halfHeight),
+			arenaSize.X,
+			wallThickness,
+			true // horizontal
 		);
 		topWall.Name = "TopWall";
 		_boundaries.AddChild(topWall);
 
 		// Bottom wall
-		var bottomWall = CreateBoundaryLine(
-			new Vector2(-halfWidth, halfHeight),
-			new Vector2(halfWidth, halfHeight)
+		var bottomWall = CreateBoundaryWall(
+			new Vector2(0, halfHeight),
+			arenaSize.X,
+			wallThickness,
+			true // horizontal
 		);
 		bottomWall.Name = "BottomWall";
 		_boundaries.AddChild(bottomWall);
 
 		// Left wall
-		var leftWall = CreateBoundaryLine(
-			new Vector2(-halfWidth, -halfHeight),
-			new Vector2(-halfWidth, halfHeight)
+		var leftWall = CreateBoundaryWall(
+			new Vector2(-halfWidth, 0),
+			wallThickness,
+			arenaSize.Y,
+			false // vertical
 		);
 		leftWall.Name = "LeftWall";
 		_boundaries.AddChild(leftWall);
 
 		// Right wall
-		var rightWall = CreateBoundaryLine(
-			new Vector2(halfWidth, -halfHeight),
-			new Vector2(halfWidth, halfHeight)
+		var rightWall = CreateBoundaryWall(
+			new Vector2(halfWidth, 0),
+			wallThickness,
+			arenaSize.Y,
+			false // vertical
 		);
 		rightWall.Name = "RightWall";
 		_boundaries.AddChild(rightWall);
 
-		GD.Print($"[Arena] ✓ Generated boundaries ({arenaSize.X}x{arenaSize.Y})");
+		GD.Print($"[Arena] ✓ Generated boundaries ({arenaSize.X}x{arenaSize.Y}) with collision");
 	}
 
 	/// <summary>
-	/// Creates a single boundary line
+	/// Creates a single boundary wall with collision
 	/// </summary>
-	private Line2D CreateBoundaryLine(Vector2 start, Vector2 end)
+	private StaticBody2D CreateBoundaryWall(Vector2 position, float width, float height, bool horizontal)
 	{
-		var line = new Line2D();
-		line.AddPoint(start);
-		line.AddPoint(end);
-		line.DefaultColor = BOUNDARY_COLOR;
-		line.Width = BOUNDARY_WIDTH;
-		return line;
+		var wall = new StaticBody2D();
+		wall.Position = position;
+		wall.CollisionLayer = COLLISION_LAYER;
+		wall.CollisionMask = 0;
+
+		// Create collision shape
+		var collisionShape = new CollisionShape2D();
+		var rectShape = new RectangleShape2D();
+		rectShape.Size = new Vector2(width, height);
+		collisionShape.Shape = rectShape;
+		wall.AddChild(collisionShape);
+
+		// Create visual outline
+		var outline = new Line2D();
+		float halfWidth = width / 2;
+		float halfHeight = height / 2;
+
+		outline.AddPoint(new Vector2(-halfWidth, -halfHeight));
+		outline.AddPoint(new Vector2(halfWidth, -halfHeight));
+		outline.AddPoint(new Vector2(halfWidth, halfHeight));
+		outline.AddPoint(new Vector2(-halfWidth, halfHeight));
+		outline.AddPoint(new Vector2(-halfWidth, -halfHeight)); // Close the loop
+		outline.DefaultColor = BOUNDARY_COLOR;
+		outline.Width = BOUNDARY_WIDTH;
+		wall.AddChild(outline);
+
+		return wall;
 	}
 
 	/// <summary>
