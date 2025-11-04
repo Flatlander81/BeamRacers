@@ -17,7 +17,7 @@ public partial class Player : CharacterBody2D
 	private Polygon2D _bodyPolygon;
 	private Line2D _outlineLine;
 	private Polygon2D _shieldVisual;
-	private Line2D _trailLine;
+	private Node2D _trailRenderer; // Container for trail segments
 	private Area2D _trailCollision;
 	private CollisionPolygon2D _trailCollisionShape;
 
@@ -53,15 +53,21 @@ public partial class Player : CharacterBody2D
 		_bodyPolygon = GetNode<Polygon2D>("Sprite/Body");
 		_outlineLine = GetNode<Line2D>("Sprite/Outline");
 		_shieldVisual = GetNode<Polygon2D>("ShieldSystem/ShieldVisual");
-		_trailLine = GetNode<Line2D>("TrailRenderer/TrailLine");
+		_trailRenderer = GetNode<Node2D>("TrailRenderer");
 		_trailCollision = GetNode<Area2D>("TrailRenderer/TrailCollision");
 		_trailCollisionShape = GetNode<CollisionPolygon2D>("TrailRenderer/TrailCollision/TrailCollisionShape");
 
+		// Remove the old TrailLine node if it exists (we'll create segments dynamically)
+		var oldTrailLine = GetNodeOrNull<Line2D>("TrailRenderer/TrailLine");
+		if (oldTrailLine != null)
+		{
+			oldTrailLine.QueueFree();
+		}
+
 		// Move trail renderer to world space so it doesn't move with player
-		var trailRenderer = GetNode<Node2D>("TrailRenderer");
-		RemoveChild(trailRenderer);
-		GetParent().AddChild(trailRenderer);
-		trailRenderer.GlobalPosition = Vector2.Zero;
+		RemoveChild(_trailRenderer);
+		GetParent().AddChild(_trailRenderer);
+		_trailRenderer.GlobalPosition = Vector2.Zero;
 
 		GD.Print("[Player] ✓ Trail renderer moved to world space");
 
@@ -367,14 +373,68 @@ public partial class Player : CharacterBody2D
 	/// </summary>
 	private void UpdateTrailVisual()
 	{
-		if (_trailPoints.Count > 0)
+		// Clear all existing trail line segments
+		foreach (Node child in _trailRenderer.GetChildren())
 		{
-			// Trail points are in global coordinates
-			// TrailLine is now in world space at (0,0), so global coords work directly
-			_trailLine.Points = _trailPoints.ToArray();
-			_trailLine.DefaultColor = new Color(0, 1, 1, 0.8f);
-			_trailLine.Width = TRAIL_WIDTH;
+			if (child is Line2D)
+			{
+				child.QueueFree();
+			}
 		}
+
+		if (_trailPoints.Count < 2)
+			return;
+
+		// Create separate Line2D segments whenever there's a gap
+		const float GAP_DETECTION_THRESHOLD = 20.0f; // Points > 20 pixels apart indicate a gap
+
+		List<Vector2> currentSegment = new List<Vector2>();
+		currentSegment.Add(_trailPoints[0]);
+
+		for (int i = 1; i < _trailPoints.Count; i++)
+		{
+			float distance = _trailPoints[i].DistanceTo(_trailPoints[i - 1]);
+
+			if (distance > GAP_DETECTION_THRESHOLD)
+			{
+				// Gap detected - finish current segment and start new one
+				if (currentSegment.Count >= 2)
+				{
+					CreateTrailSegment(currentSegment);
+				}
+				currentSegment.Clear();
+				currentSegment.Add(_trailPoints[i]);
+			}
+			else
+			{
+				// Continue current segment
+				currentSegment.Add(_trailPoints[i]);
+			}
+		}
+
+		// Create final segment
+		if (currentSegment.Count >= 2)
+		{
+			CreateTrailSegment(currentSegment);
+		}
+	}
+
+	/// <summary>
+	/// Creates a Line2D segment for a continuous portion of the trail
+	/// </summary>
+	private void CreateTrailSegment(List<Vector2> points)
+	{
+		var line = new Line2D();
+		line.Points = points.ToArray();
+		line.DefaultColor = new Color(0, 1, 1, 0.8f); // Cyan
+		line.Width = TRAIL_WIDTH;
+
+		// Add additive blend for glow effect
+		var material = new CanvasItemMaterial();
+		material.BlendMode = CanvasItemMaterial.BlendModeEnum.Add;
+		line.Material = material;
+
+		_trailRenderer.AddChild(line);
 	}
 
 	/// <summary>
@@ -590,46 +650,23 @@ public partial class Player : CharacterBody2D
 		Vector2 gapStart = closestPointOnSegment - segmentDir * HALF_GAP;
 		Vector2 gapEnd = closestPointOnSegment + segmentDir * HALF_GAP;
 
-		// Rebuild trail with gap
+		// Rebuild trail with gap - simple approach
 		List<Vector2> newTrailPoints = new List<Vector2>();
 
-		// Add points before the gap
+		// Add all points up to and including the start of the broken segment
 		for (int i = 0; i <= closestSegmentIndex; i++)
 		{
-			Vector2 point = _trailPoints[i];
-
-			// Check if this point is before the gap
-			float distToGapStart = (point - segmentStart).Dot(segmentDir);
-			float gapStartDist = (gapStart - segmentStart).Dot(segmentDir);
-
-			if (distToGapStart < gapStartDist)
-			{
-				newTrailPoints.Add(point);
-			}
-			else
-			{
-				// Add the gap start point and stop
-				newTrailPoints.Add(gapStart);
-				break;
-			}
+			newTrailPoints.Add(_trailPoints[i]);
 		}
 
-		// Add the gap end point
+		// Add gap points
+		newTrailPoints.Add(gapStart);
 		newTrailPoints.Add(gapEnd);
 
-		// Add points after the gap
-		for (int i = closestSegmentIndex; i < _trailPoints.Count; i++)
+		// Add all points from the end of the broken segment onwards
+		for (int i = closestSegmentIndex + 1; i < _trailPoints.Count; i++)
 		{
-			Vector2 point = _trailPoints[i];
-
-			// Check if this point is after the gap
-			float distToGapEnd = (point - segmentStart).Dot(segmentDir);
-			float gapEndDist = (gapEnd - segmentStart).Dot(segmentDir);
-
-			if (distToGapEnd > gapEndDist)
-			{
-				newTrailPoints.Add(point);
-			}
+			newTrailPoints.Add(_trailPoints[i]);
 		}
 
 		// Update trail points
@@ -719,7 +756,15 @@ public partial class Player : CharacterBody2D
 		_trailPoints.Clear();
 		_distanceSinceLastTrailPoint = 0.0f;
 
-		_trailLine.Points = Array.Empty<Vector2>();
+		// Clear all trail line segments
+		foreach (Node child in _trailRenderer.GetChildren())
+		{
+			if (child is Line2D)
+			{
+				child.QueueFree();
+			}
+		}
+
 		_trailCollisionShape.Polygon = Array.Empty<Vector2>();
 
 		GD.Print("[Player] Trail cleared");
