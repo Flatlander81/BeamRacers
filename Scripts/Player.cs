@@ -4,6 +4,21 @@ using System.Collections.Generic;
 using System.Linq;
 
 /// <summary>
+/// Represents a single trail wall segment with start and end points
+/// </summary>
+public struct TrailWall
+{
+	public Vector2 Start;
+	public Vector2 End;
+
+	public TrailWall(Vector2 start, Vector2 end)
+	{
+		Start = start;
+		End = end;
+	}
+}
+
+/// <summary>
 /// Player Light Cycle controller with movement, trail, shield, and collision systems.
 /// </summary>
 public partial class Player : CharacterBody2D
@@ -28,12 +43,9 @@ public partial class Player : CharacterBody2D
 	private bool _inputEnabled = true;
 
 	// ========== TRAIL STATE ==========
-	private List<List<Vector2>> _trailSegments = new List<List<Vector2>>(); // Trail stored as separate segments
-	private List<Vector2> _currentSegment = new List<Vector2>(); // Current segment being built
-	private float _distanceSinceLastTrailPoint = 0.0f;
-	private const float TRAIL_POINT_DISTANCE = 5.0f;
+	private List<TrailWall> _walls = new List<TrailWall>(); // All completed walls
+	private Vector2 _currentWallStart = Vector2.Zero; // Start point of wall currently being laid
 	private const float TRAIL_WIDTH = 4.0f;
-	private const float TRAIL_COLLISION_SAFE_DISTANCE = 25.0f; // Don't collide with trail within this radius
 
 	// ========== SHIELD STATE ==========
 	private enum ShieldState { Ready, Active, Cooldown }
@@ -80,6 +92,9 @@ public partial class Player : CharacterBody2D
 		// Generate visuals
 		GenerateWedgeGeometry();
 		GenerateShieldGeometry();
+
+		// Initialize wall start at player spawn position
+		_currentWallStart = GlobalPosition;
 
 		GD.Print("[Player] ✓ Player initialized");
 	}
@@ -222,10 +237,25 @@ public partial class Player : CharacterBody2D
 			// Snap position to grid
 			SnapToGrid();
 
+			// Finalize current wall before turning
+			if (_currentWallStart != Vector2.Zero)
+			{
+				var wall = new TrailWall(_currentWallStart, GlobalPosition);
+				_walls.Add(wall);
+				GD.Print($"[Player] Wall completed: {_currentWallStart} -> {GlobalPosition}");
+			}
+
+			// Start new wall at turn point
+			_currentWallStart = GlobalPosition;
+
 			// Execute the turn
 			_currentDirection = _queuedDirection.Value;
 			_queuedDirection = null;
 			UpdateRotationFromDirection();
+
+			// Update visuals and collision
+			UpdateTrailVisual();
+			UpdateTrailCollision();
 
 			GD.Print($"[Player] Turn executed at {GlobalPosition}");
 		}
@@ -302,76 +332,12 @@ public partial class Player : CharacterBody2D
 
 	// ========== TRAIL SYSTEM ==========
 	/// <summary>
-	/// Updates the trail based on player movement
+	/// Updates the trail (walls created on turns, this updates current wall visual)
 	/// </summary>
 	private void UpdateTrail()
 	{
-		// Add trail points as player moves
-		if (Velocity.Length() > 1.0f)
-		{
-			_distanceSinceLastTrailPoint += Velocity.Length() * (float)GetPhysicsProcessDeltaTime();
-
-			if (_distanceSinceLastTrailPoint >= TRAIL_POINT_DISTANCE)
-			{
-				AddTrailPoint(GlobalPosition);
-				_distanceSinceLastTrailPoint = 0.0f;
-			}
-		}
-	}
-
-	/// <summary>
-	/// Adds a trail point, merging collinear points to reduce trail size
-	/// </summary>
-	private void AddTrailPoint(Vector2 newPoint)
-	{
-		if (_currentSegment.Count == 0)
-		{
-			// First point in current segment
-			_currentSegment.Add(newPoint);
-		}
-		else if (_currentSegment.Count == 1)
-		{
-			// Second point in current segment
-			_currentSegment.Add(newPoint);
-		}
-		else
-		{
-			// Check if last 3 points are collinear (in a straight line)
-			Vector2 p1 = _currentSegment[_currentSegment.Count - 2];
-			Vector2 p2 = _currentSegment[_currentSegment.Count - 1];
-			Vector2 p3 = newPoint;
-
-			if (ArePointsCollinear(p1, p2, p3))
-			{
-				// Points are in a straight line, replace the middle point
-				_currentSegment[_currentSegment.Count - 1] = newPoint;
-			}
-			else
-			{
-				// Corner detected, add new point
-				_currentSegment.Add(newPoint);
-			}
-		}
-
-		// Update visuals
+		// Update visual to show current wall being laid from last turn to player position
 		UpdateTrailVisual();
-		UpdateTrailCollision();
-	}
-
-	/// <summary>
-	/// Checks if three points are collinear (in a straight line)
-	/// </summary>
-	private bool ArePointsCollinear(Vector2 p1, Vector2 p2, Vector2 p3)
-	{
-		// Use cross product to check collinearity
-		// If cross product is ~0, points are collinear
-		Vector2 v1 = p2 - p1;
-		Vector2 v2 = p3 - p2;
-
-		float crossProduct = v1.X * v2.Y - v1.Y * v2.X;
-
-		// Allow small threshold for floating point errors
-		return Mathf.Abs(crossProduct) < 0.1f;
 	}
 
 	/// <summary>
@@ -379,7 +345,7 @@ public partial class Player : CharacterBody2D
 	/// </summary>
 	private void UpdateTrailVisual()
 	{
-		// Clear all existing trail line segments - collect first to avoid modification during iteration
+		// Clear all existing trail lines
 		var childrenToRemove = new List<Node>();
 		foreach (Node child in _trailRenderer.GetChildren())
 		{
@@ -394,29 +360,27 @@ public partial class Player : CharacterBody2D
 			child.QueueFree();
 		}
 
-		// Render all completed segments
-		foreach (var segment in _trailSegments)
+		// Render all completed walls
+		foreach (var wall in _walls)
 		{
-			if (segment.Count >= 2)
-			{
-				CreateTrailSegment(segment);
-			}
+			CreateWallLine(wall);
 		}
 
-		// Render current segment being built
-		if (_currentSegment.Count >= 2)
+		// Render current wall being laid
+		if (_currentWallStart != Vector2.Zero)
 		{
-			CreateTrailSegment(_currentSegment);
+			var currentWall = new TrailWall(_currentWallStart, GlobalPosition);
+			CreateWallLine(currentWall);
 		}
 	}
 
 	/// <summary>
-	/// Creates a Line2D segment for a continuous portion of the trail
+	/// Creates a Line2D for a single wall
 	/// </summary>
-	private void CreateTrailSegment(List<Vector2> points)
+	private void CreateWallLine(TrailWall wall)
 	{
 		var line = new Line2D();
-		line.Points = points.ToArray();
+		line.Points = new Vector2[] { wall.Start, wall.End };
 		line.DefaultColor = new Color(0, 1, 1, 0.8f); // Cyan
 		line.Width = TRAIL_WIDTH;
 
@@ -426,20 +390,6 @@ public partial class Player : CharacterBody2D
 		line.Material = material;
 
 		_trailRenderer.AddChild(line);
-	}
-
-	/// <summary>
-	/// Gets all trail points from all segments
-	/// </summary>
-	private List<Vector2> GetAllTrailPoints()
-	{
-		List<Vector2> allPoints = new List<Vector2>();
-		foreach (var segment in _trailSegments)
-		{
-			allPoints.AddRange(segment);
-		}
-		allPoints.AddRange(_currentSegment);
-		return allPoints;
 	}
 
 	/// <summary>
@@ -457,80 +407,41 @@ public partial class Player : CharacterBody2D
 			}
 		}
 
-		// Create collision shape for each segment
-		foreach (var segment in _trailSegments)
+		// Create collision shape for each wall
+		foreach (var wall in _walls)
 		{
-			CreateCollisionForSegment(segment);
+			CreateCollisionForWall(wall);
 		}
 
-		// Create collision for current segment
-		CreateCollisionForSegment(_currentSegment);
+		// Create collision for current wall (don't create collision too close to player)
+		if (_currentWallStart != Vector2.Zero && _currentWallStart.DistanceTo(GlobalPosition) > 25.0f)
+		{
+			var currentWall = new TrailWall(_currentWallStart, GlobalPosition);
+			CreateCollisionForWall(currentWall);
+		}
 	}
 
 	/// <summary>
-	/// Creates a collision polygon for a single trail segment
+	/// Creates a collision polygon for a single wall
 	/// </summary>
-	private void CreateCollisionForSegment(List<Vector2> segment)
+	private void CreateCollisionForWall(TrailWall wall)
 	{
-		if (segment.Count < 2)
-			return;
+		// Create a rectangular collision polygon with width around the wall
+		Vector2 direction = (wall.End - wall.Start).Normalized();
+		Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * (TRAIL_WIDTH / 2.0f);
 
-		// Filter out trail points that are too close to the player
-		List<Vector2> validPoints = new List<Vector2>();
-		foreach (var point in segment)
+		// Create 4 corners of rectangle
+		Vector2[] collisionPoints = new Vector2[]
 		{
-			if (point.DistanceTo(GlobalPosition) >= TRAIL_COLLISION_SAFE_DISTANCE)
-			{
-				validPoints.Add(point);
-			}
-		}
-
-		if (validPoints.Count < 2)
-			return;
-
-		// Create a collision polygon with width around the trail line
-		List<Vector2> collisionPoints = new List<Vector2>();
-		float halfWidth = TRAIL_WIDTH / 2.0f;
-
-		// Create offset points on both sides of the trail
-		for (int i = 0; i < validPoints.Count - 1; i++)
-		{
-			Vector2 current = validPoints[i];
-			Vector2 next = validPoints[i + 1];
-			Vector2 direction = (next - current).Normalized();
-			Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfWidth;
-
-			if (i == 0)
-			{
-				collisionPoints.Add(current + perpendicular);
-			}
-			collisionPoints.Add(next + perpendicular);
-		}
-
-		// Add points in reverse for the other side
-		for (int i = validPoints.Count - 1; i >= 0; i--)
-		{
-			Vector2 point = validPoints[i];
-
-			if (i > 0)
-			{
-				Vector2 prev = validPoints[i - 1];
-				Vector2 direction = (point - prev).Normalized();
-				Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfWidth;
-				collisionPoints.Add(point - perpendicular);
-			}
-			else
-			{
-				Vector2 next = validPoints[i + 1];
-				Vector2 direction = (next - point).Normalized();
-				Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfWidth;
-				collisionPoints.Add(point - perpendicular);
-			}
-		}
+			wall.Start + perpendicular,  // Top-left
+			wall.End + perpendicular,    // Top-right
+			wall.End - perpendicular,    // Bottom-right
+			wall.Start - perpendicular   // Bottom-left
+		};
 
 		// Create collision polygon node
 		var collisionShape = new CollisionPolygon2D();
-		collisionShape.Polygon = collisionPoints.ToArray();
+		collisionShape.Polygon = collisionPoints;
 		_trailCollision.AddChild(collisionShape);
 	}
 
@@ -682,89 +593,61 @@ public partial class Player : CharacterBody2D
 	/// </summary>
 	private void BreakTrail(Vector2 contactPoint)
 	{
-		const float GAP_SIZE = 30.0f; // Total gap size
-		const float HALF_GAP = GAP_SIZE / 2.0f;
+		const float HALF_GAP = 15.0f; // 15 pixels on each side = 30px total gap
 
-		GD.Print($"[Player] BreakTrail called at contact point {contactPoint}, searching {_trailSegments.Count} completed segments");
+		GD.Print($"[Player] BreakTrail called at contact point {contactPoint}, searching {_walls.Count} walls");
 
-		// Find the closest line segment to the actual contact point
-		int closestSegmentListIndex = -1;
-		int closestPointIndex = -1;
+		// Get player's right vector (perpendicular to forward direction)
+		Vector2 forwardDir = GetDirectionVector();
+		Vector2 rightDir = new Vector2(-forwardDir.Y, forwardDir.X);
+
+		// Calculate gap endpoints: +/- 15 pixels along player's right vector
+		Vector2 gapPoint1 = contactPoint + rightDir * HALF_GAP;
+		Vector2 gapPoint2 = contactPoint - rightDir * HALF_GAP;
+
+		GD.Print($"[Player] Gap points: {gapPoint1} and {gapPoint2}");
+
+		// Find the wall that was hit
+		int hitWallIndex = -1;
 		float closestDistance = float.MaxValue;
-		Vector2 closestPointOnSegment = Vector2.Zero;
-		List<Vector2> closestSegment = null;
 
-		// ONLY search completed segments, never break the current segment being laid
-		for (int segIdx = 0; segIdx < _trailSegments.Count; segIdx++)
+		for (int i = 0; i < _walls.Count; i++)
 		{
-			var segment = _trailSegments[segIdx];
-			for (int i = 0; i < segment.Count - 1; i++)
-			{
-				Vector2 start = segment[i];
-				Vector2 end = segment[i + 1];
-				Vector2 pointOnSegment = ClosestPointOnLineSegment(contactPoint, start, end);
-				float distance = contactPoint.DistanceTo(pointOnSegment);
+			Vector2 closestPoint = ClosestPointOnLineSegment(contactPoint, _walls[i].Start, _walls[i].End);
+			float distance = contactPoint.DistanceTo(closestPoint);
 
-				if (distance < closestDistance)
-				{
-					closestDistance = distance;
-					closestSegmentListIndex = segIdx;
-					closestPointIndex = i;
-					closestPointOnSegment = pointOnSegment;
-					closestSegment = segment;
-				}
+			if (distance < closestDistance)
+			{
+				closestDistance = distance;
+				hitWallIndex = i;
 			}
 		}
 
-		GD.Print($"[Player] Closest segment to contact point: listIdx={closestSegmentListIndex}, pointIdx={closestPointIndex}, distance={closestDistance:F1}");
-
-		if (closestSegment == null || closestDistance > 20.0f)
+		if (hitWallIndex == -1 || closestDistance > 10.0f)
 		{
-			GD.Print($"[Player] Shield miss - no trail segment at contact point (distance: {closestDistance:F1}, threshold: 20.0)");
+			GD.Print($"[Player] No wall found at contact point (closest distance: {closestDistance:F1})");
 			return;
 		}
 
-		// Calculate gap endpoints
-		Vector2 segmentStart = closestSegment[closestPointIndex];
-		Vector2 segmentEnd = closestSegment[closestPointIndex + 1];
-		Vector2 segmentDir = (segmentEnd - segmentStart).Normalized();
-		Vector2 gapStart = closestPointOnSegment - segmentDir * HALF_GAP;
-		Vector2 gapEnd = closestPointOnSegment + segmentDir * HALF_GAP;
+		TrailWall hitWall = _walls[hitWallIndex];
+		GD.Print($"[Player] Hit wall #{hitWallIndex}: {hitWall.Start} -> {hitWall.End}");
 
-		// Split the segment at the gap
-		List<Vector2> beforeGap = new List<Vector2>();
-		List<Vector2> afterGap = new List<Vector2>();
+		// Create two new walls with the gap
+		// Wall 1: original start -> gapPoint2  (the -15 pixel point)
+		// Wall 2: gapPoint1 -> original end   (the +15 pixel point)
+		TrailWall wall1 = new TrailWall(hitWall.Start, gapPoint2);
+		TrailWall wall2 = new TrailWall(gapPoint1, hitWall.End);
 
-		// Points before the break
-		for (int i = 0; i <= closestPointIndex; i++)
-		{
-			beforeGap.Add(closestSegment[i]);
-		}
-		beforeGap.Add(gapStart);
+		// Replace the hit wall with two new walls
+		_walls.RemoveAt(hitWallIndex);
+		_walls.Insert(hitWallIndex, wall1);
+		_walls.Insert(hitWallIndex + 1, wall2);
 
-		// Points after the break
-		afterGap.Add(gapEnd);
-		for (int i = closestPointIndex + 1; i < closestSegment.Count; i++)
-		{
-			afterGap.Add(closestSegment[i]);
-		}
-
-		// Breaking a completed segment - replace with two segments
-		_trailSegments.RemoveAt(closestSegmentListIndex);
-		if (beforeGap.Count >= 2)
-		{
-			_trailSegments.Insert(closestSegmentListIndex, beforeGap);
-		}
-		if (afterGap.Count >= 2)
-		{
-			_trailSegments.Insert(closestSegmentListIndex + (beforeGap.Count >= 2 ? 1 : 0), afterGap);
-		}
+		GD.Print($"[Player] Wall broken! Created 30px gap. New walls: [{wall1.Start}->{wall1.End}] and [{wall2.Start}->{wall2.End}]");
 
 		// Update visuals and collision
 		UpdateTrailVisual();
 		UpdateTrailCollision();
-
-		GD.Print($"[Player] Trail broken! Created {GAP_SIZE}px gap at {closestPointOnSegment}");
 	}
 
 	/// <summary>
@@ -796,7 +679,7 @@ public partial class Player : CharacterBody2D
 		GD.Print("═══════════════════════════════");
 		GD.Print("[Player] PLAYER DEATH");
 		GD.Print($"[Player] Position: {GlobalPosition}");
-		GD.Print($"[Player] Trail points: {GetAllTrailPoints().Count}");
+		GD.Print($"[Player] Trail walls: {_walls.Count}");
 		GD.Print("═══════════════════════════════");
 
 		// Stop movement
@@ -837,15 +720,14 @@ public partial class Player : CharacterBody2D
 	}
 
 	/// <summary>
-	/// Clears all trail points
+	/// Clears all trail walls
 	/// </summary>
 	public void ClearTrail()
 	{
-		_trailSegments.Clear();
-		_currentSegment.Clear();
-		_distanceSinceLastTrailPoint = 0.0f;
+		_walls.Clear();
+		_currentWallStart = GlobalPosition;
 
-		// Clear all trail line segments
+		// Clear all trail line visuals
 		foreach (Node child in _trailRenderer.GetChildren())
 		{
 			if (child is Line2D)
@@ -889,6 +771,6 @@ public partial class Player : CharacterBody2D
 			_ => "UNKNOWN"
 		};
 
-		GD.Print($"[Player] Pos: {GlobalPosition:F0} | Dir: {directionName} | Speed: {Velocity.Length():F0} | Trail: {GetAllTrailPoints().Count} pts | Shield: {shieldStatus}");
+		GD.Print($"[Player] Pos: {GlobalPosition:F0} | Dir: {directionName} | Speed: {Velocity.Length():F0} | Walls: {_walls.Count} | Shield: {shieldStatus}");
 	}
 }
