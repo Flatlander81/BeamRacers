@@ -27,6 +27,7 @@ public partial class Main : Node2D
 	private bool _gameStarted = false;
 	private GameManager _gameManager;
 	private Player _player;
+	private Arena _arena;
 
 	public override void _Ready()
 	{
@@ -194,6 +195,9 @@ public partial class Main : Node2D
 		// Create grid background
 		CreateGridBackground();
 
+		// Spawn the arena
+		SpawnArena();
+
 		// Spawn the player
 		SpawnPlayer();
 
@@ -329,6 +333,51 @@ public partial class Main : Node2D
 			// We'll update camera position in _Process
 			GD.Print("[Main] ✓ Camera will follow player");
 		}
+
+		// Set arena bounds for player
+		if (_arena != null)
+		{
+			var bounds = _arena.GetArenaBounds();
+			GD.Print($"[Main] ✓ Arena bounds available: {bounds.Size.X}x{bounds.Size.Y}");
+		}
+	}
+
+	/// <summary>
+	/// Spawns the arena for the current room
+	/// </summary>
+	private void SpawnArena()
+	{
+		// Load the arena scene
+		var arenaScene = GD.Load<PackedScene>("res://Scenes/Arena/Arena.tscn");
+		if (arenaScene == null)
+		{
+			GD.PrintErr("[Main] ERROR: Failed to load Arena scene!");
+			return;
+		}
+
+		// Instantiate the arena
+		_arena = arenaScene.Instantiate<Arena>();
+		if (_arena == null)
+		{
+			GD.PrintErr("[Main] ERROR: Failed to instantiate Arena!");
+			return;
+		}
+
+		// Add to game layer (BEFORE player so it's behind)
+		_gameLayer.AddChild(_arena);
+
+		// Generate arena for current room
+		if (_gameManager != null)
+		{
+			_arena.GenerateArena(_gameManager.CurrentRoom);
+			GD.Print($"[Main] ✓ Arena spawned and generated for room {_gameManager.CurrentRoom}");
+		}
+		else
+		{
+			// Fallback if GameManager not found
+			_arena.GenerateArena(1);
+			GD.Print("[Main] ✓ Arena spawned and generated (default room 1)");
+		}
 	}
 
 	public override void _Process(double delta)
@@ -347,6 +396,46 @@ public partial class Main : Node2D
 		if (_player != null && _camera != null)
 		{
 			_camera.Position = _player.Position;
+		}
+
+	}
+
+	public override void _Input(InputEvent @event)
+	{
+		// TEST HOTKEYS: F1-F6 to switch arena templates (only during gameplay)
+		if (!_gameStarted || _arena == null)
+			return;
+
+		// Check for F-key presses
+		if (@event is InputEventKey keyEvent && keyEvent.Pressed && !keyEvent.Echo)
+		{
+			switch (keyEvent.Keycode)
+			{
+				case Key.F1:
+					_arena.GenerateArenaByTemplate(0); // The Box
+					GD.Print("[Main] ⚡ F1 pressed - Loading 'The Box' arena");
+					break;
+				case Key.F2:
+					_arena.GenerateArenaByTemplate(1); // Four Pillars
+					GD.Print("[Main] ⚡ F2 pressed - Loading 'Four Pillars' arena");
+					break;
+				case Key.F3:
+					_arena.GenerateArenaByTemplate(2); // The Cross
+					GD.Print("[Main] ⚡ F3 pressed - Loading 'The Cross' arena");
+					break;
+				case Key.F4:
+					_arena.GenerateArenaByTemplate(3); // The Ring
+					GD.Print("[Main] ⚡ F4 pressed - Loading 'The Ring' arena");
+					break;
+				case Key.F5:
+					_arena.GenerateArenaByTemplate(4); // Scattered
+					GD.Print("[Main] ⚡ F5 pressed - Loading 'Scattered' arena");
+					break;
+				case Key.F6:
+					_arena.GenerateProceduralArena(); // Procedural (random each time)
+					GD.Print("[Main] ⚡ F6 pressed - Generating PROCEDURAL arena (random)");
+					break;
+			}
 		}
 	}
 
