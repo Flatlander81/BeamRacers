@@ -402,7 +402,7 @@ public partial class Main : Node2D
 
 	public override void _Input(InputEvent @event)
 	{
-		// TEST HOTKEYS: F1-F5 to switch arena templates (only during gameplay)
+		// TEST HOTKEYS: F1-F6 to switch arena templates (only during gameplay)
 		if (!_gameStarted || _arena == null)
 			return;
 
@@ -430,6 +430,10 @@ public partial class Main : Node2D
 				case Key.F5:
 					_arena.GenerateArenaByTemplate(4); // Scattered
 					GD.Print("[Main] ⚡ F5 pressed - Loading 'Scattered' arena");
+					break;
+				case Key.F6:
+					_arena.GenerateProceduralArena(); // Procedural (random each time)
+					GD.Print("[Main] ⚡ F6 pressed - Generating PROCEDURAL arena (random)");
 					break;
 			}
 		}

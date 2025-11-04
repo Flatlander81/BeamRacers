@@ -462,6 +462,110 @@ public partial class Arena : Node2D
 	}
 
 	/// <summary>
+	/// Generate completely procedural arena with random rectangular obstacles (for testing/variety)
+	/// Guarantees survivability with safe spawn zone and obstacle spacing
+	/// </summary>
+	/// <param name="seed">Random seed for reproducible generation (0 = random)</param>
+	/// <param name="sizeScale">Scale factor for arena size (default 1.0)</param>
+	public void GenerateProceduralArena(int seed = 0, float sizeScale = 1.0f)
+	{
+		// Use seed for reproducible generation, or create new random seed
+		Random procRandom = seed != 0 ? new Random(seed) : new Random();
+
+		GD.Print($"\n[Arena] ═══ GENERATING PROCEDURAL ARENA (Seed: {(seed != 0 ? seed.ToString() : "Random")}) ═══");
+
+		// Clear existing obstacles
+		ClearObstacles();
+
+		// Apply size scale
+		_currentScale = sizeScale;
+		Vector2 scaledSize = _arenaSize * sizeScale;
+
+		// Generate boundaries
+		GenerateBoundaries(scaledSize);
+
+		// Procedural generation parameters
+		const float SAFE_ZONE_RADIUS = 200f;  // Clear area around spawn point (0,0)
+		const float MIN_OBSTACLE_DISTANCE = 120f;  // Minimum distance between obstacles
+		const float SAFE_BOUNDARY_MARGIN = 380f;  // Stay within ±380 to survive rotation
+		const int MIN_OBSTACLES = 8;
+		const int MAX_OBSTACLES = 15;
+
+		// Decide how many obstacles to spawn
+		int obstacleCount = procRandom.Next(MIN_OBSTACLES, MAX_OBSTACLES + 1);
+		GD.Print($"[Arena] Generating {obstacleCount} procedural obstacles...");
+
+		// Track placed obstacle positions for spacing validation
+		var placedPositions = new List<Vector2>();
+
+		int placedCount = 0;
+		int attempts = 0;
+		const int MAX_ATTEMPTS = 200;  // Prevent infinite loops
+
+		while (placedCount < obstacleCount && attempts < MAX_ATTEMPTS)
+		{
+			attempts++;
+
+			// Decide obstacle type (60% walls, 40% pillars)
+			bool isWall = procRandom.NextDouble() < 0.6;
+
+			// Generate random position within safe zone
+			float x = (float)(procRandom.NextDouble() * 2 - 1) * SAFE_BOUNDARY_MARGIN;
+			float y = (float)(procRandom.NextDouble() * 2 - 1) * SAFE_BOUNDARY_MARGIN;
+			Vector2 position = new Vector2(x, y);
+
+			// Check if too close to spawn point
+			if (position.Length() < SAFE_ZONE_RADIUS)
+			{
+				continue;  // Too close to spawn, skip
+			}
+
+			// Check if too close to other obstacles
+			bool tooClose = false;
+			foreach (var existingPos in placedPositions)
+			{
+				if (position.DistanceTo(existingPos) < MIN_OBSTACLE_DISTANCE)
+				{
+					tooClose = true;
+					break;
+				}
+			}
+
+			if (tooClose)
+			{
+				continue;  // Too close to another obstacle, skip
+			}
+
+			// Valid position! Create the obstacle
+			if (isWall)
+			{
+				// Random wall parameters
+				float length = (float)(procRandom.NextDouble() * 180 + 100);  // 100-280 units
+				float rotation = (float)(procRandom.NextDouble() * Mathf.Pi * 2);  // Random angle
+
+				SpawnWall(position, length, rotation);
+			}
+			else
+			{
+				// Random pillar parameters
+				float radius = (float)(procRandom.NextDouble() * 20 + 25);  // 25-45 units
+
+				SpawnPillar(position, radius);
+			}
+
+			placedPositions.Add(position);
+			placedCount++;
+		}
+
+		GD.Print($"[Arena] Successfully placed {placedCount} obstacles after {attempts} attempts");
+		GD.Print($"[Arena] Arena size: {scaledSize.X}x{scaledSize.Y}, scale: {sizeScale:F2}");
+		GD.Print("[Arena] ═══════════════════════════════════\n");
+
+		// Trigger redraw for grid
+		QueueRedraw();
+	}
+
+	/// <summary>
 	/// Select an arena template based on room difficulty
 	/// </summary>
 	private ArenaTemplate SelectTemplate(int roomNumber)
