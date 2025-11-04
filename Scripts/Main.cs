@@ -251,20 +251,40 @@ public partial class Main : Node2D
 			_gridBackground.AddChild(line);
 		}
 
-		// Add origin marker (brighter yellow)
-		var originLineH = new Line2D();
-		originLineH.AddPoint(new Vector2(-100, 0));
-		originLineH.AddPoint(new Vector2(100, 0));
-		originLineH.DefaultColor = new Color(1.0f, 1.0f, 0.0f, 0.6f);
-		originLineH.Width = 2.0f;
-		_gridBackground.AddChild(originLineH);
+		// Add bright border lines to mark grid boundaries
+		Color borderColor = new Color(1.0f, 1.0f, 0.0f, 0.8f); // Brighter yellow
 
-		var originLineV = new Line2D();
-		originLineV.AddPoint(new Vector2(0, -100));
-		originLineV.AddPoint(new Vector2(0, 100));
-		originLineV.DefaultColor = new Color(1.0f, 1.0f, 0.0f, 0.6f);
-		originLineV.Width = 2.0f;
-		_gridBackground.AddChild(originLineV);
+		// Top border
+		var borderTop = new Line2D();
+		borderTop.AddPoint(new Vector2(-GridExtent, -GridExtent));
+		borderTop.AddPoint(new Vector2(GridExtent, -GridExtent));
+		borderTop.DefaultColor = borderColor;
+		borderTop.Width = 3.0f;
+		_gridBackground.AddChild(borderTop);
+
+		// Bottom border
+		var borderBottom = new Line2D();
+		borderBottom.AddPoint(new Vector2(-GridExtent, GridExtent));
+		borderBottom.AddPoint(new Vector2(GridExtent, GridExtent));
+		borderBottom.DefaultColor = borderColor;
+		borderBottom.Width = 3.0f;
+		_gridBackground.AddChild(borderBottom);
+
+		// Left border
+		var borderLeft = new Line2D();
+		borderLeft.AddPoint(new Vector2(-GridExtent, -GridExtent));
+		borderLeft.AddPoint(new Vector2(-GridExtent, GridExtent));
+		borderLeft.DefaultColor = borderColor;
+		borderLeft.Width = 3.0f;
+		_gridBackground.AddChild(borderLeft);
+
+		// Right border
+		var borderRight = new Line2D();
+		borderRight.AddPoint(new Vector2(GridExtent, -GridExtent));
+		borderRight.AddPoint(new Vector2(GridExtent, GridExtent));
+		borderRight.DefaultColor = borderColor;
+		borderRight.Width = 3.0f;
+		_gridBackground.AddChild(borderRight);
 
 		_gameLayer.AddChild(_gridBackground);
 		GD.Print($"[Main] ✓ Grid background created ({GridSize}px yellow grid, extent: {GridExtent})");
@@ -294,8 +314,9 @@ public partial class Main : Node2D
 		// Set starting position (center of screen)
 		_player.Position = Vector2.Zero;
 
-		// Set grid size for grid-snapped turning
+		// Set grid parameters for grid-snapped turning and boundary detection
 		_player.GridSize = GridSize;
+		_player.GridExtent = GridExtent;
 
 		// Add to game layer
 		_gameLayer.AddChild(_player);

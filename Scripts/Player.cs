@@ -23,6 +23,7 @@ public partial class Player : CharacterBody2D
 
 	// ========== MOVEMENT STATE ==========
 	public int GridSize = 50; // Set by Main scene
+	public int GridExtent = 2000; // Set by Main scene
 	private int _currentDirection = 0; // 0=right, 1=down, 2=left, 3=up
 	private int? _queuedDirection = null; // Queued turn waiting for grid alignment
 	private bool _inputEnabled = true;
@@ -154,6 +155,9 @@ public partial class Player : CharacterBody2D
 		// Move and slide
 		MoveAndSlide();
 
+		// Check if player left the grid boundary
+		CheckBoundary();
+
 		// Update trail
 		UpdateTrail();
 
@@ -166,6 +170,20 @@ public partial class Player : CharacterBody2D
 		{
 			PrintDebugInfo();
 			_frameCounter = 0;
+		}
+	}
+
+	/// <summary>
+	/// Checks if player has left the grid boundary and dies if so
+	/// </summary>
+	private void CheckBoundary()
+	{
+		if (!_inputEnabled) return; // Already dead
+
+		if (Mathf.Abs(GlobalPosition.X) > GridExtent || Mathf.Abs(GlobalPosition.Y) > GridExtent)
+		{
+			GD.Print($"[Player] Left grid boundary at {GlobalPosition}");
+			Die();
 		}
 	}
 
@@ -206,22 +224,22 @@ public partial class Player : CharacterBody2D
 	}
 
 	/// <summary>
-	/// Checks if player is aligned to grid for current movement direction
+	/// Checks if player is aligned to grid for turning
 	/// </summary>
 	private bool IsAlignedToGrid()
 	{
-		// For horizontal movement (Right/Left), Y must be on grid line
-		// For vertical movement (Up/Down), X must be on grid line
-		if (_currentDirection == 0 || _currentDirection == 2) // Right or Left
+		// When moving horizontally, Y is already aligned, check if X is aligned (at intersection)
+		// When moving vertically, X is already aligned, check if Y is aligned (at intersection)
+		if (_currentDirection == 0 || _currentDirection == 2) // Right or Left (horizontal)
 		{
-			// Check Y alignment
-			float remainder = Mathf.Abs(GlobalPosition.Y) % GridSize;
-			return remainder < 2.0f || remainder > (GridSize - 2.0f); // Within 2 pixels of grid line
-		}
-		else // Up or Down
-		{
-			// Check X alignment
+			// Check X alignment (changing axis)
 			float remainder = Mathf.Abs(GlobalPosition.X) % GridSize;
+			return remainder < 2.0f || remainder > (GridSize - 2.0f);
+		}
+		else // Up or Down (vertical)
+		{
+			// Check Y alignment (changing axis)
+			float remainder = Mathf.Abs(GlobalPosition.Y) % GridSize;
 			return remainder < 2.0f || remainder > (GridSize - 2.0f);
 		}
 	}
