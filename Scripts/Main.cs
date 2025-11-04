@@ -26,6 +26,7 @@ public partial class Main : Node2D
 	// Game state
 	private bool _gameStarted = false;
 	private GameManager _gameManager;
+	private RoomManager _roomManager;
 	private Player _player;
 	private Arena _arena;
 
@@ -38,6 +39,12 @@ public partial class Main : Node2D
 		// Get reference to GameManager
 		_gameManager = GetNode<GameManager>("/root/GameManager");
 		GD.Print("[Main] ✓ GameManager reference acquired");
+
+		// Create RoomManager instance
+		_roomManager = new RoomManager();
+		_roomManager.Name = "RoomManager";
+		AddChild(_roomManager);
+		GD.Print("[Main] ✓ RoomManager created");
 
 		// Get scene layer references
 		InitializeSceneLayers();
@@ -200,6 +207,17 @@ public partial class Main : Node2D
 
 		// Spawn the player
 		SpawnPlayer();
+
+		// Pass references to RoomManager
+		if (_roomManager != null)
+		{
+			_roomManager.SetPlayer(_player);
+			_roomManager.SetArena(_arena);
+			GD.Print("[Main] ✓ RoomManager references configured");
+
+			// Start room 1
+			_roomManager.StartRoom(1);
+		}
 
 		GD.Print("[Main] ✓ Game start sequence complete\n");
 	}
