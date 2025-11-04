@@ -28,6 +28,7 @@ public partial class Main : Node2D
 	private GameManager _gameManager;
 	private Player _player;
 	private Arena _arena;
+	private EnemySpawner _enemySpawner;
 
 	public override void _Ready()
 	{
@@ -41,6 +42,12 @@ public partial class Main : Node2D
 
 		// Get scene layer references
 		InitializeSceneLayers();
+
+		// Initialize enemy spawner
+		_enemySpawner = new EnemySpawner();
+		_enemySpawner.Name = "EnemySpawner";
+		AddChild(_enemySpawner);
+		GD.Print("[Main] ✓ EnemySpawner initialized");
 
 		// Create the start screen UI
 		CreateStartScreen();
@@ -200,6 +207,9 @@ public partial class Main : Node2D
 
 		// Spawn the player
 		SpawnPlayer();
+
+		// Spawn enemies after player and arena are ready
+		SpawnEnemies();
 
 		GD.Print("[Main] ✓ Game start sequence complete\n");
 	}
@@ -378,6 +388,40 @@ public partial class Main : Node2D
 			_arena.GenerateArena(1);
 			GD.Print("[Main] ✓ Arena spawned and generated (default room 1)");
 		}
+	}
+
+	/// <summary>
+	/// Spawns enemies for the current room
+	/// </summary>
+	private void SpawnEnemies()
+	{
+		if (_enemySpawner == null)
+		{
+			GD.PrintErr("[Main] ERROR: EnemySpawner not initialized!");
+			return;
+		}
+
+		if (_player == null)
+		{
+			GD.PrintErr("[Main] ERROR: Cannot spawn enemies - Player not found!");
+			return;
+		}
+
+		if (_gameManager == null)
+		{
+			GD.PrintErr("[Main] ERROR: Cannot spawn enemies - GameManager not found!");
+			return;
+		}
+
+		// Spawn enemies for current room
+		_enemySpawner.SpawnEnemies(
+			_gameManager.CurrentRoom,
+			_player.GlobalPosition,
+			_gameLayer,
+			GridExtent
+		);
+
+		GD.Print("[Main] ✓ Enemies spawned for current room");
 	}
 
 	public override void _Process(double delta)
