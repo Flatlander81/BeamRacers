@@ -15,7 +15,8 @@ public partial class Main : Node2D
 	private Node2D _gridBackground;
 
 	// UI references
-	private ColorRect _background;
+	private ColorRect _titleBackground;  // Title screen background
+	private ColorRect _gameBackground;   // Game background
 	private Label _titleLabel;
 
 	// Game state
@@ -120,14 +121,14 @@ public partial class Main : Node2D
 		// Get viewport size for positioning
 		Vector2 viewportSize = GetViewportRect().Size;
 
-		// Create black background
-		_background = new ColorRect();
-		_background.Name = "Background";
-		_background.Color = Colors.Black;
-		_background.Size = viewportSize;
-		_background.Position = Vector2.Zero;
-		_uiLayer.AddChild(_background);
-		GD.Print($"[Main] ✓ Background created (size: {viewportSize})");
+		// Create black background for title screen
+		_titleBackground = new ColorRect();
+		_titleBackground.Name = "TitleBackground";
+		_titleBackground.Color = Colors.Black;
+		_titleBackground.Size = viewportSize;
+		_titleBackground.Position = Vector2.Zero;
+		_uiLayer.AddChild(_titleBackground);
+		GD.Print($"[Main] ✓ Title background created (size: {viewportSize})");
 
 		// Create title label
 		_titleLabel = new Label();
@@ -160,13 +161,19 @@ public partial class Main : Node2D
 
 		GD.Print("\n[Main] ▶▶▶ STARTING GAME ◀◀◀");
 
-		// Hide start screen text (keep background visible)
+		// Hide title screen
 		if (_titleLabel != null)
 		{
 			_titleLabel.Visible = false;
 		}
-		// Keep the black background visible during gameplay
+		if (_titleBackground != null)
+		{
+			_titleBackground.Visible = false;
+		}
 		GD.Print("[Main] ✓ Start screen hidden");
+
+		// Create game background (in game layer, behind everything)
+		CreateGameBackground();
 
 		// Tell GameManager to start a new run
 		if (_gameManager != null)
@@ -187,6 +194,23 @@ public partial class Main : Node2D
 		SpawnPlayer();
 
 		GD.Print("[Main] ✓ Game start sequence complete\n");
+	}
+
+	/// <summary>
+	/// Creates the black background for the game
+	/// </summary>
+	private void CreateGameBackground()
+	{
+		// Create a large black ColorRect that follows the camera
+		_gameBackground = new ColorRect();
+		_gameBackground.Name = "GameBackground";
+		_gameBackground.Color = Colors.Black;
+		_gameBackground.Size = new Vector2(10000, 10000);
+		_gameBackground.Position = new Vector2(-5000, -5000); // Center it
+		_gameBackground.ZIndex = -1000; // Way behind everything
+
+		_gameLayer.AddChild(_gameBackground);
+		GD.Print("[Main] ✓ Game background created (black, 10000x10000)");
 	}
 
 	/// <summary>
