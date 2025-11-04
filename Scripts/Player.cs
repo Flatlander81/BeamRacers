@@ -591,6 +591,9 @@ public partial class Player : CharacterBody2D
 
 			if (_shieldState == ShieldState.Active)
 			{
+				GD.Print($"[Player] Shield collision detected at {GlobalPosition}");
+				GD.Print($"[Player] Current segments: {_trailSegments.Count}, Current segment points: {_currentSegment.Count}");
+
 				// Break trail at contact point
 				BreakTrail(GlobalPosition);
 				GD.Print("[Player] Shield absorbed trail collision!");
@@ -610,6 +613,8 @@ public partial class Player : CharacterBody2D
 	{
 		const float GAP_SIZE = 30.0f; // Total gap size
 		const float HALF_GAP = GAP_SIZE / 2.0f;
+
+		GD.Print($"[Player] BreakTrail called at {contactPoint}, searching {_trailSegments.Count} completed segments and current segment with {_currentSegment.Count} points");
 
 		// Find the closest line segment across all trail segments
 		int closestSegmentListIndex = -1; // Which segment list (completed or current)
@@ -654,9 +659,11 @@ public partial class Player : CharacterBody2D
 			}
 		}
 
+		GD.Print($"[Player] Closest segment found: listIdx={closestSegmentListIndex}, pointIdx={closestPointIndex}, distance={closestDistance:F1}");
+
 		if (closestSegment == null || closestDistance > 50.0f)
 		{
-			GD.Print("[Player] Shield miss - no trail segment nearby");
+			GD.Print($"[Player] Shield miss - no trail segment nearby (distance: {closestDistance:F1}, threshold: 50.0)");
 			return;
 		}
 
