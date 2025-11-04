@@ -368,7 +368,7 @@ public partial class Player : CharacterBody2D
 		}
 
 		// Render current wall being laid
-		if (_currentWallStart != Vector2.Zero && GlobalPosition != _currentWallStart)
+		if (_hasWallStart && GlobalPosition != _currentWallStart)
 		{
 			var currentWall = new TrailWall(_currentWallStart, GlobalPosition);
 			CreateWallLine(currentWall);
@@ -556,18 +556,15 @@ public partial class Player : CharacterBody2D
 	}
 
 	/// <summary>
-	/// Finds and breaks the closest wall to the player
+	/// Finds and removes the closest wall to the player (simplified shield break)
 	/// </summary>
 	private void BreakClosestWall()
 	{
-		const float HALF_GAP = 15.0f; // 15 pixels on each side = 30px total gap
-
 		GD.Print($"[Player] Breaking closest wall at player position {GlobalPosition}, searching {_walls.Count} walls");
 
 		// Find the closest wall to the player
 		int hitWallIndex = -1;
 		float closestDistance = float.MaxValue;
-		Vector2 contactPoint = Vector2.Zero;
 
 		for (int i = 0; i < _walls.Count; i++)
 		{
@@ -582,7 +579,6 @@ public partial class Player : CharacterBody2D
 			{
 				closestDistance = distance;
 				hitWallIndex = i;
-				contactPoint = closestPoint;
 			}
 		}
 
@@ -593,36 +589,22 @@ public partial class Player : CharacterBody2D
 		}
 
 		TrailWall hitWall = _walls[hitWallIndex];
-		GD.Print($"[Player] Hit wall #{hitWallIndex}: {hitWall.Start} -> {hitWall.End}, contact at {contactPoint}");
+		GD.Print($"[Player] Hit wall #{hitWallIndex}: {hitWall.Start} -> {hitWall.End}, removing entire wall");
 
-		// Get player's right vector (perpendicular to forward direction)
-		Vector2 forwardDir = GetDirectionVector();
-		Vector2 rightDir = new Vector2(-forwardDir.Y, forwardDir.X);
-
-		// Calculate gap endpoints: +/- 15 pixels along player's right vector from contact point
-		Vector2 gapPoint1 = contactPoint + rightDir * HALF_GAP;
-		Vector2 gapPoint2 = contactPoint - rightDir * HALF_GAP;
-
-		GD.Print($"[Player] Gap points: {gapPoint1} and {gapPoint2}");
-
-		// Create two new walls with the gap
-		// Wall 1: original start -> gapPoint2  (the -15 pixel point)
-		// Wall 2: gapPoint1 -> original end   (the +15 pixel point)
-		TrailWall wall1 = new TrailWall(hitWall.Start, gapPoint2);
-		TrailWall wall2 = new TrailWall(gapPoint1, hitWall.End);
-
-		// Replace the hit wall with two new walls
+		// Simply remove the entire wall
 		_walls.RemoveAt(hitWallIndex);
-		_walls.Insert(hitWallIndex, wall1);
-		_walls.Insert(hitWallIndex + 1, wall2);
 
-		// Update _lastWallIndex if needed (we added an extra wall)
-		if (_lastWallIndex >= hitWallIndex)
+		// Update _lastWallIndex if needed (we removed a wall)
+		if (_lastWallIndex > hitWallIndex)
 		{
-			_lastWallIndex++; // Shift index forward since we inserted a wall
+			_lastWallIndex--; // Shift index back since we removed a wall before it
+		}
+		else if (_lastWallIndex == hitWallIndex)
+		{
+			_lastWallIndex = -1; // The last wall was removed
 		}
 
-		GD.Print($"[Player] Wall broken! Created 30px gap. New walls: [{wall1.Start}->{wall1.End}] and [{wall2.Start}->{wall2.End}]");
+		GD.Print($"[Player] Wall completely destroyed!");
 
 		// Update visuals and collision
 		UpdateTrailVisual();
