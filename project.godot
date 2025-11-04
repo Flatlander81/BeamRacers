@@ -11,8 +11,13 @@ config_version=5
 [application]
 
 config/name="BeamRacers"
+run/main_scene="res://Scenes/Main.tscn"
 config/features=PackedStringArray("4.5", "C#", "Forward Plus")
 config/icon="res://icon.svg"
+
+[autoload]
+
+GameManager="*res://Scripts/GameManager.cs"
 
 [display]
 
