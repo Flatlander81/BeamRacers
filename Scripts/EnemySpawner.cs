@@ -96,7 +96,7 @@ public partial class EnemySpawner : Node
 			// Instantiate enemy
 			EnemyCycle enemy = _enemyCycleScene.Instantiate<EnemyCycle>();
 			enemy.GlobalPosition = spawnPos;
-			enemy.MaxSpeed = enemySpeed;
+			enemy.MoveSpeed = enemySpeed;
 			enemy.GridSize = gridSize;
 			enemy.ArenaBounds = arenaBounds;
 
