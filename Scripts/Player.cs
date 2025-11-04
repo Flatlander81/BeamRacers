@@ -296,20 +296,13 @@ public partial class Player : CharacterBody2D
 	/// </summary>
 	private void SnapToGrid()
 	{
+		// When turning at grid intersection, snap BOTH X and Y to grid
 		Vector2 snappedPos = GlobalPosition;
-
-		if (_currentDirection == 0 || _currentDirection == 2) // Right or Left
-		{
-			// Snap Y to grid
-			snappedPos.Y = Mathf.Round(snappedPos.Y / GridSize) * GridSize;
-		}
-		else // Up or Down
-		{
-			// Snap X to grid
-			snappedPos.X = Mathf.Round(snappedPos.X / GridSize) * GridSize;
-		}
-
+		snappedPos.X = Mathf.Round(snappedPos.X / GridSize) * GridSize;
+		snappedPos.Y = Mathf.Round(snappedPos.Y / GridSize) * GridSize;
 		GlobalPosition = snappedPos;
+
+		GD.Print($"[Player] Snapped to grid: {GlobalPosition}");
 	}
 
 	/// <summary>
@@ -535,22 +528,13 @@ public partial class Player : CharacterBody2D
 				// Only break trail once per shield activation
 				if (!_shieldBrokeTrailThisActivation)
 				{
-					GD.Print($"[Player] Shield collision detected, raycasting forward to find wall...");
+					GD.Print($"[Player] Shield collision detected at {GlobalPosition}");
 
-					// Raycast in forward direction to find actual collision point
-					Vector2 contactPoint = FindWallCollisionPoint();
+					// Find the closest wall to the player and break it
+					BreakClosestWall();
+					_shieldBrokeTrailThisActivation = true;
 
-					if (contactPoint != Vector2.Zero)
-					{
-						GD.Print($"[Player] Wall contact point found at {contactPoint}");
-						BreakTrail(contactPoint);
-						_shieldBrokeTrailThisActivation = true;
-						GD.Print("[Player] Shield absorbed trail collision!");
-					}
-					else
-					{
-						GD.Print("[Player] Warning: No wall found by raycast, shield collision may have been edge case");
-					}
+					GD.Print("[Player] Shield absorbed trail collision!");
 				}
 				// Subsequent collisions during same activation are ignored
 			}
@@ -563,80 +547,54 @@ public partial class Player : CharacterBody2D
 	}
 
 	/// <summary>
-	/// Casts a ray forward to find where the player is about to hit a wall
+	/// Finds and breaks the closest wall to the player
 	/// </summary>
-	private Vector2 FindWallCollisionPoint()
-	{
-		var spaceState = GetWorld2D().DirectSpaceState;
-		Vector2 forwardDir = GetDirectionVector();
-
-		// Cast a ray from player position forward, looking for trail collision
-		// Check up to 50 pixels ahead
-		var query = PhysicsRayQueryParameters2D.Create(GlobalPosition, GlobalPosition + forwardDir * 50.0f);
-
-		// Only collide with trail collision layer (assuming trail is on layer 2)
-		query.CollideWithAreas = true;
-		query.CollideWithBodies = false;
-		query.Exclude = new Godot.Collections.Array<Rid> { GetRid() }; // Don't hit self
-
-		var result = spaceState.IntersectRay(query);
-
-		if (result.Count > 0)
-		{
-			// Check if we hit the trail collision area
-			var collider = result["collider"].AsGodotObject();
-			if (collider == _trailCollision)
-			{
-				return (Vector2)result["position"];
-			}
-		}
-
-		return Vector2.Zero; // No collision found
-	}
-
-	/// <summary>
-	/// Breaks the trail at a specific contact point by creating a gap
-	/// </summary>
-	private void BreakTrail(Vector2 contactPoint)
+	private void BreakClosestWall()
 	{
 		const float HALF_GAP = 15.0f; // 15 pixels on each side = 30px total gap
 
-		GD.Print($"[Player] BreakTrail called at contact point {contactPoint}, searching {_walls.Count} walls");
+		GD.Print($"[Player] Breaking closest wall at player position {GlobalPosition}, searching {_walls.Count} walls");
 
-		// Get player's right vector (perpendicular to forward direction)
-		Vector2 forwardDir = GetDirectionVector();
-		Vector2 rightDir = new Vector2(-forwardDir.Y, forwardDir.X);
-
-		// Calculate gap endpoints: +/- 15 pixels along player's right vector
-		Vector2 gapPoint1 = contactPoint + rightDir * HALF_GAP;
-		Vector2 gapPoint2 = contactPoint - rightDir * HALF_GAP;
-
-		GD.Print($"[Player] Gap points: {gapPoint1} and {gapPoint2}");
-
-		// Find the wall that was hit
+		// Find the closest wall to the player
 		int hitWallIndex = -1;
 		float closestDistance = float.MaxValue;
+		Vector2 contactPoint = Vector2.Zero;
 
 		for (int i = 0; i < _walls.Count; i++)
 		{
-			Vector2 closestPoint = ClosestPointOnLineSegment(contactPoint, _walls[i].Start, _walls[i].End);
-			float distance = contactPoint.DistanceTo(closestPoint);
+			// Skip the last wall (no collision yet)
+			if (i == _lastWallIndex)
+				continue;
+
+			Vector2 closestPoint = ClosestPointOnLineSegment(GlobalPosition, _walls[i].Start, _walls[i].End);
+			float distance = GlobalPosition.DistanceTo(closestPoint);
 
 			if (distance < closestDistance)
 			{
 				closestDistance = distance;
 				hitWallIndex = i;
+				contactPoint = closestPoint;
 			}
 		}
 
-		if (hitWallIndex == -1 || closestDistance > 10.0f)
+		if (hitWallIndex == -1 || closestDistance > 20.0f)
 		{
-			GD.Print($"[Player] No wall found at contact point (closest distance: {closestDistance:F1})");
+			GD.Print($"[Player] No wall found near player (closest distance: {closestDistance:F1})");
 			return;
 		}
 
 		TrailWall hitWall = _walls[hitWallIndex];
-		GD.Print($"[Player] Hit wall #{hitWallIndex}: {hitWall.Start} -> {hitWall.End}");
+		GD.Print($"[Player] Hit wall #{hitWallIndex}: {hitWall.Start} -> {hitWall.End}, contact at {contactPoint}");
+
+		// Get player's right vector (perpendicular to forward direction)
+		Vector2 forwardDir = GetDirectionVector();
+		Vector2 rightDir = new Vector2(-forwardDir.Y, forwardDir.X);
+
+		// Calculate gap endpoints: +/- 15 pixels along player's right vector from contact point
+		Vector2 gapPoint1 = contactPoint + rightDir * HALF_GAP;
+		Vector2 gapPoint2 = contactPoint - rightDir * HALF_GAP;
+
+		GD.Print($"[Player] Gap points: {gapPoint1} and {gapPoint2}");
 
 		// Create two new walls with the gap
 		// Wall 1: original start -> gapPoint2  (the -15 pixel point)
