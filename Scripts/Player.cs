@@ -9,10 +9,7 @@ using System.Linq;
 public partial class Player : CharacterBody2D
 {
 	// ========== EXPORTS ==========
-	[Export] public float MaxSpeed = 300.0f;
-	[Export] public float Acceleration = 600.0f;
-	[Export] public float Deceleration = 400.0f;
-	[Export] public float RotationSpeed = 5.0f;
+	[Export] public float MoveSpeed = 200.0f;
 	[Export] public float ShieldDuration = 1.5f;
 	[Export] public float ShieldCooldown = 8.0f;
 
@@ -25,7 +22,7 @@ public partial class Player : CharacterBody2D
 	private CollisionPolygon2D _trailCollisionShape;
 
 	// ========== MOVEMENT STATE ==========
-	private Vector2 _currentVelocity = Vector2.Zero;
+	private int _currentDirection = 0; // 0=right, 1=down, 2=left, 3=up
 	private bool _inputEnabled = true;
 
 	// ========== TRAIL STATE ==========
@@ -139,9 +136,12 @@ public partial class Player : CharacterBody2D
 		{
 			ProcessMovement(deltaF);
 		}
+		else
+		{
+			Velocity = Vector2.Zero;
+		}
 
 		// Move and slide
-		Velocity = _currentVelocity;
 		MoveAndSlide();
 
 		// Update trail
@@ -160,39 +160,50 @@ public partial class Player : CharacterBody2D
 	}
 
 	/// <summary>
-	/// Processes player movement input
+	/// Processes player movement input - Tron-style 90-degree turns
 	/// </summary>
 	private void ProcessMovement(float delta)
 	{
-		// Get input direction
-		Vector2 inputDir = Input.GetVector("move_left", "move_right", "move_up", "move_down");
-
-		if (inputDir.Length() > 0)
+		// Handle turning (only when not already turning)
+		if (Input.IsActionJustPressed("move_left"))
 		{
-			// Accelerate toward input direction
-			_currentVelocity = _currentVelocity.MoveToward(
-				inputDir.Normalized() * MaxSpeed,
-				Acceleration * delta
-			);
-
-			// Smooth rotation toward movement direction
-			float targetRotation = inputDir.Angle();
-			Rotation = Mathf.LerpAngle(Rotation, targetRotation, RotationSpeed * delta);
+			// Turn left (counter-clockwise)
+			_currentDirection = (_currentDirection + 3) % 4; // +3 is same as -1 with wrapping
+			UpdateRotationFromDirection();
 		}
-		else
+		else if (Input.IsActionJustPressed("move_right"))
 		{
-			// Decelerate when no input
-			_currentVelocity = _currentVelocity.MoveToward(
-				Vector2.Zero,
-				Deceleration * delta
-			);
+			// Turn right (clockwise)
+			_currentDirection = (_currentDirection + 1) % 4;
+			UpdateRotationFromDirection();
 		}
 
-		// Clamp to max speed
-		if (_currentVelocity.Length() > MaxSpeed)
+		// Always move forward in current direction
+		Vector2 moveDirection = GetDirectionVector();
+		Velocity = moveDirection * MoveSpeed;
+	}
+
+	/// <summary>
+	/// Gets the movement direction vector based on current direction
+	/// </summary>
+	private Vector2 GetDirectionVector()
+	{
+		return _currentDirection switch
 		{
-			_currentVelocity = _currentVelocity.Normalized() * MaxSpeed;
-		}
+			0 => Vector2.Right,  // East
+			1 => Vector2.Down,   // South
+			2 => Vector2.Left,   // West
+			3 => Vector2.Up,     // North
+			_ => Vector2.Right
+		};
+	}
+
+	/// <summary>
+	/// Updates the visual rotation to match the current direction
+	/// </summary>
+	private void UpdateRotationFromDirection()
+	{
+		Rotation = _currentDirection * Mathf.Pi / 2.0f; // 0, 90, 180, 270 degrees
 	}
 
 	// ========== TRAIL SYSTEM ==========
@@ -202,9 +213,9 @@ public partial class Player : CharacterBody2D
 	private void UpdateTrail()
 	{
 		// Add trail points as player moves
-		if (_currentVelocity.Length() > 1.0f)
+		if (Velocity.Length() > 1.0f)
 		{
-			_distanceSinceLastTrailPoint += _currentVelocity.Length() * (float)GetPhysicsProcessDeltaTime();
+			_distanceSinceLastTrailPoint += Velocity.Length() * (float)GetPhysicsProcessDeltaTime();
 
 			if (_distanceSinceLastTrailPoint >= TRAIL_POINT_DISTANCE)
 			{
@@ -445,7 +456,6 @@ public partial class Player : CharacterBody2D
 		GD.Print("═══════════════════════════════");
 
 		// Stop movement
-		_currentVelocity = Vector2.Zero;
 		_inputEnabled = false;
 
 		// TODO: Spawn death particle effect
@@ -473,7 +483,7 @@ public partial class Player : CharacterBody2D
 	public void ResetPosition(Vector2 pos)
 	{
 		GlobalPosition = pos;
-		_currentVelocity = Vector2.Zero;
+		_currentDirection = 0; // Face right
 		Rotation = 0;
 		_inputEnabled = true;
 
@@ -510,6 +520,15 @@ public partial class Player : CharacterBody2D
 			_ => "UNKNOWN"
 		};
 
-		GD.Print($"[Player] Pos: {GlobalPosition:F0} | Vel: {_currentVelocity.Length():F0} | Trail: {_trailPoints.Count} pts | Shield: {shieldStatus}");
+		string directionName = _currentDirection switch
+		{
+			0 => "RIGHT",
+			1 => "DOWN",
+			2 => "LEFT",
+			3 => "UP",
+			_ => "UNKNOWN"
+		};
+
+		GD.Print($"[Player] Pos: {GlobalPosition:F0} | Dir: {directionName} | Speed: {Velocity.Length():F0} | Trail: {_trailPoints.Count} pts | Shield: {shieldStatus}");
 	}
 }

@@ -12,6 +12,7 @@ public partial class Main : Node2D
 	private Node2D _gameLayer;
 	private CanvasLayer _uiLayer;
 	private Node2D _effectsLayer;
+	private Node2D _gridBackground;
 
 	// UI references
 	private ColorRect _background;
@@ -182,10 +183,68 @@ public partial class Main : Node2D
 			return;
 		}
 
+		// Create grid background
+		CreateGridBackground();
+
 		// Spawn the player
 		SpawnPlayer();
 
 		GD.Print("[Main] ✓ Game start sequence complete\n");
+	}
+
+	/// <summary>
+	/// Creates a visual grid background for movement reference
+	/// </summary>
+	private void CreateGridBackground()
+	{
+		_gridBackground = new Node2D();
+		_gridBackground.Name = "GridBackground";
+		_gridBackground.ZIndex = -100; // Behind everything
+
+		// Create grid lines
+		const int GRID_SIZE = 50;
+		const int GRID_EXTENT = 2000; // How far the grid extends
+		Color gridColor = new Color(0.1f, 0.1f, 0.2f, 1.0f); // Dark blue
+
+		// Vertical lines
+		for (int x = -GRID_EXTENT; x <= GRID_EXTENT; x += GRID_SIZE)
+		{
+			var line = new Line2D();
+			line.AddPoint(new Vector2(x, -GRID_EXTENT));
+			line.AddPoint(new Vector2(x, GRID_EXTENT));
+			line.DefaultColor = gridColor;
+			line.Width = 1.0f;
+			_gridBackground.AddChild(line);
+		}
+
+		// Horizontal lines
+		for (int y = -GRID_EXTENT; y <= GRID_EXTENT; y += GRID_SIZE)
+		{
+			var line = new Line2D();
+			line.AddPoint(new Vector2(-GRID_EXTENT, y));
+			line.AddPoint(new Vector2(GRID_EXTENT, y));
+			line.DefaultColor = gridColor;
+			line.Width = 1.0f;
+			_gridBackground.AddChild(line);
+		}
+
+		// Add origin marker (brighter)
+		var originLineH = new Line2D();
+		originLineH.AddPoint(new Vector2(-100, 0));
+		originLineH.AddPoint(new Vector2(100, 0));
+		originLineH.DefaultColor = new Color(0.3f, 0.3f, 0.5f, 1.0f);
+		originLineH.Width = 2.0f;
+		_gridBackground.AddChild(originLineH);
+
+		var originLineV = new Line2D();
+		originLineV.AddPoint(new Vector2(0, -100));
+		originLineV.AddPoint(new Vector2(0, 100));
+		originLineV.DefaultColor = new Color(0.3f, 0.3f, 0.5f, 1.0f);
+		originLineV.Width = 2.0f;
+		_gridBackground.AddChild(originLineV);
+
+		_gameLayer.AddChild(_gridBackground);
+		GD.Print("[Main] ✓ Grid background created (50px grid)");
 	}
 
 	/// <summary>
