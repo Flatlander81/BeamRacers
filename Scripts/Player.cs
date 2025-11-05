@@ -31,6 +31,9 @@ public partial class Player : GridCycle
 	private float _shieldPulseTime = 0.0f;
 	private bool _shieldBrokeTrailThisActivation = false;
 
+	// ========== DEATH STATE ==========
+	private bool _isDead = false;
+
 	// ========== DEBUG ==========
 	private int _frameCounter = 0;
 
@@ -46,8 +49,8 @@ public partial class Player : GridCycle
 		_trailRenderer = GetNode<Node2D>("TrailRenderer");
 		_trailCollision = GetNode<Area2D>("TrailRenderer/TrailCollision");
 
-		// Initialize trail renderer
-		InitializeTrailRenderer(_trailRenderer);
+		// Initialize trail renderer (now reconnects signal after reparenting)
+		InitializeTrailRenderer(_trailRenderer, _trailCollision);
 		GD.Print("[Player] ✓ Trail renderer moved to world space");
 
 		// Generate visuals
@@ -57,6 +60,11 @@ public partial class Player : GridCycle
 		// Register with TrailManager
 		RegisterWithTrailManager(new Color(0, 1, 1, 0.8f), _trailRenderer, _trailCollision, "Player");
 
+		// Debug: Verify collision configuration
+		GD.Print($"[Player] CollisionLayer: {CollisionLayer}, CollisionMask: {CollisionMask}");
+		GD.Print($"[Player] TrailCollision Layer: {_trailCollision.CollisionLayer}, Mask: {_trailCollision.CollisionMask}");
+		GD.Print($"[Player] TrailCollision Monitoring: {_trailCollision.Monitoring}, Monitorable: {_trailCollision.Monitorable}");
+		GD.Print($"[Player] TrailCollision Parent: {_trailCollision.GetParent().Name}");
 		GD.Print($"[Player] ✓ Player initialized at {GlobalPosition}");
 	}
 
@@ -257,8 +265,10 @@ public partial class Player : GridCycle
 	/// <summary>
 	/// Called when something collides with the trail
 	/// </summary>
-	private void _OnTrailCollisionBodyEntered(Node2D body)
+	protected override void _OnTrailCollisionBodyEntered(Node2D body)
 	{
+		GD.Print($"[Player] Trail collision detected with: {body.Name} (Type: {body.GetType().Name})");
+
 		// Check if it's the player hitting their own trail
 		if (body == this)
 		{
@@ -291,6 +301,10 @@ public partial class Player : GridCycle
 	/// </summary>
 	public void Die()
 	{
+		// Prevent double-death (can happen if hit multiple trails simultaneously)
+		if (_isDead) return;
+		_isDead = true;
+
 		GD.Print("═══════════════════════════════");
 		GD.Print("[Player] PLAYER DEATH");
 		GD.Print($"[Player] Position: {GlobalPosition}");

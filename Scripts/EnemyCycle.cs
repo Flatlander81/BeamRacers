@@ -33,6 +33,9 @@ public partial class EnemyCycle : GridCycle
 	private float _nextDecisionTime = 0.0f;
 	private const float DECISION_INTERVAL = 0.3f;
 
+	// ========== DEATH STATE ==========
+	private bool _isDead = false;
+
 	// ========== TRAIL AVOIDANCE ==========
 	private const float AVOIDANCE_CHECK_DISTANCE = 150.0f;
 
@@ -47,8 +50,8 @@ public partial class EnemyCycle : GridCycle
 		_trailRenderer = GetNode<Node2D>("TrailRenderer");
 		_trailCollision = GetNode<Area2D>("TrailRenderer/TrailCollision");
 
-		// Initialize trail renderer
-		InitializeTrailRenderer(_trailRenderer);
+		// Initialize trail renderer (now reconnects signal after reparenting)
+		InitializeTrailRenderer(_trailRenderer, _trailCollision);
 
 		// Generate visuals
 		GenerateWedgeGeometry();
@@ -58,6 +61,12 @@ public partial class EnemyCycle : GridCycle
 
 		// Register with TrailManager
 		RegisterWithTrailManager(new Color(1, 0, 0, 0.8f), _trailRenderer, _trailCollision, "EnemyCycle");
+
+		// Debug: Verify collision configuration
+		GD.Print($"[EnemyCycle] CollisionLayer: {CollisionLayer}, CollisionMask: {CollisionMask}");
+		GD.Print($"[EnemyCycle] TrailCollision Layer: {_trailCollision.CollisionLayer}, Mask: {_trailCollision.CollisionMask}");
+		GD.Print($"[EnemyCycle] TrailCollision Monitoring: {_trailCollision.Monitoring}, Monitorable: {_trailCollision.Monitorable}");
+		GD.Print($"[EnemyCycle] TrailCollision Parent: {_trailCollision.GetParent().Name}");
 
 		// Find player reference
 		_player = GetTree().Root.FindChild("Player", true, false) as Player;
@@ -270,8 +279,10 @@ public partial class EnemyCycle : GridCycle
 	/// <summary>
 	/// Called when something collides with the trail
 	/// </summary>
-	private void _OnTrailCollisionBodyEntered(Node2D body)
+	protected override void _OnTrailCollisionBodyEntered(Node2D body)
 	{
+		GD.Print($"[EnemyCycle] Trail collision detected with: {body.Name} (Type: {body.GetType().Name})");
+
 		// Check if this enemy hit its own trail
 		if (body == this)
 		{
@@ -301,6 +312,10 @@ public partial class EnemyCycle : GridCycle
 	/// </summary>
 	public void Die()
 	{
+		// Prevent double-death (can happen if hit multiple trails simultaneously)
+		if (_isDead) return;
+		_isDead = true;
+
 		GD.Print($"[EnemyCycle] Enemy died at {GlobalPosition}");
 
 		// Award cycles to player

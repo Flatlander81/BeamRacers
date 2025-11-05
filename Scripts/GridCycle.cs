@@ -109,7 +109,7 @@ public abstract partial class GridCycle : CharacterBody2D
 	/// <summary>
 	/// Initializes trail renderer by removing old nodes and moving to world space
 	/// </summary>
-	protected void InitializeTrailRenderer(Node2D trailRenderer)
+	protected void InitializeTrailRenderer(Node2D trailRenderer, Area2D trailCollision)
 	{
 		// Remove old trail nodes
 		var oldTrailLine = GetNodeOrNull<Line2D>("TrailRenderer/TrailLine");
@@ -124,11 +124,29 @@ public abstract partial class GridCycle : CharacterBody2D
 			oldCollisionShape.QueueFree();
 		}
 
+		// CRITICAL FIX: Disconnect old signal before reparenting
+		// The signal connection uses a relative path that breaks when we reparent
+		if (trailCollision.IsConnected("body_entered", new Callable(this, "_OnTrailCollisionBodyEntered")))
+		{
+			trailCollision.Disconnect("body_entered", new Callable(this, "_OnTrailCollisionBodyEntered"));
+			GD.Print($"[{GetType().Name}] Disconnected old trail collision signal");
+		}
+
 		// Move trail renderer to world space
 		RemoveChild(trailRenderer);
 		GetParent().AddChild(trailRenderer);
 		trailRenderer.GlobalPosition = Vector2.Zero;
+
+		// CRITICAL FIX: Reconnect signal after reparenting
+		// Now we can use a direct reference instead of a path
+		trailCollision.BodyEntered += _OnTrailCollisionBodyEntered;
+		GD.Print($"[{GetType().Name}] Reconnected trail collision signal after reparenting");
 	}
+
+	/// <summary>
+	/// Abstract method that child classes must implement for trail collision handling
+	/// </summary>
+	protected abstract void _OnTrailCollisionBodyEntered(Node2D body);
 
 	/// <summary>
 	/// Registers cycle with TrailManager using the specified color

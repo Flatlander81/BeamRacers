@@ -78,7 +78,8 @@ public partial class TrailManager : Node2D
 		};
 
 		_cycleTrails[cycle] = trailData;
-		GD.Print($"[TrailManager] Registered cycle: {cycle.Name}");
+		GD.Print($"[TrailManager] Registered cycle: {cycle.Name} (Type: {cycle.GetType().Name})");
+		GD.Print($"[TrailManager]   - TrailCollision instance ID: {trailCollision.GetInstanceId()}");
 	}
 
 	/// <summary>
@@ -257,6 +258,12 @@ public partial class TrailManager : Node2D
 		if (trailData.TrailCollision == null || !IsInstanceValid(trailData.TrailCollision))
 			return;
 
+		// Debug: Log which cycle's collision we're updating
+		string cycleInfo = trailData.Owner != null && IsInstanceValid(trailData.Owner)
+			? $"{trailData.Owner.Name} ({trailData.Owner.GetType().Name})"
+			: "Unknown";
+		GD.Print($"[TrailManager] Updating collision for {cycleInfo}, TrailCollision ID:{trailData.TrailCollision.GetInstanceId()}");
+
 		// Clear existing collision shapes
 		ClearChildrenOfType<CollisionPolygon2D>(trailData.TrailCollision, removeBeforeFreeing: true);
 
@@ -303,6 +310,10 @@ public partial class TrailManager : Node2D
 		var collisionShape = new CollisionPolygon2D();
 		collisionShape.Polygon = collisionPoints;
 		collisionArea.AddChild(collisionShape);
+
+		// Debug: Log collision shape creation with instance ID to track which trail this belongs to
+		GD.Print($"[TrailManager] Created collision shape for TrailCollision ID:{collisionArea.GetInstanceId()} at {wall.Start} to {wall.End}");
+		GD.Print($"[TrailManager]   - CollisionArea children count: {collisionArea.GetChildCount()}");
 	}
 
 	/// <summary>
