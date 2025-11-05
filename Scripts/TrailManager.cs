@@ -133,18 +133,9 @@ public partial class TrailManager : Node2D
 		// Update visual (includes current wall being drawn)
 		UpdateTrailVisual(trailData);
 
-		// Update grid collision for current wall segment
-		// This ensures the actively-being-drawn trail is also collidable
-		if (GridCollisionManager.Instance != null && trailData.HasWallStart &&
-		    trailData.Owner != null && IsInstanceValid(trailData.Owner))
-		{
-			Vector2 currentPos = trailData.Owner.GlobalPosition;
-			if (currentPos.DistanceTo(trailData.CurrentWallStart) > 1.0f)
-			{
-				// Mark the current trail segment in the grid
-				GridCollisionManager.Instance.SetLine(trailData.CurrentWallStart, currentPos, trailData.TrailType);
-			}
-		}
+		// NOTE: We don't update grid collision for the actively-being-drawn wall here
+		// Only finalized walls (at turns) are marked in the grid
+		// This prevents the cycle from immediately hitting its own trail as it draws it
 	}
 
 	/// <summary>
