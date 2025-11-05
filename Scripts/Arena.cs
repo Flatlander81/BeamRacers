@@ -382,9 +382,13 @@ public partial class Arena : Node2D
 		// Store current template
 		_currentTemplate = selectedTemplate;
 
-		// Apply random rotation (0°, 90°, 180°, 270°)
-		float[] possibleRotations = { 0, Mathf.Pi / 2, Mathf.Pi, 3 * Mathf.Pi / 2 };
-		float arenaRotation = possibleRotations[_random.Next(possibleRotations.Length)];
+		// Apply random rotation (0°, 90°, 180°, 270°) - SKIP for collision test arena
+		float arenaRotation = 0f;
+		if (selectedTemplate.Name != "Collision Test Arena")
+		{
+			float[] possibleRotations = { 0, Mathf.Pi / 2, Mathf.Pi, 3 * Mathf.Pi / 2 };
+			arenaRotation = possibleRotations[_random.Next(possibleRotations.Length)];
+		}
 
 		// Apply size scale
 		_currentScale = sizeScale;
