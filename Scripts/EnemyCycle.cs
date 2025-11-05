@@ -518,8 +518,28 @@ public partial class EnemyCycle : CharacterBody2D
 	/// </summary>
 	private void _OnTrailCollisionBodyEntered(Node2D body)
 	{
-		// Check if enemy hit a trail (including its own)
-		Die();
+		// Check if this enemy hit its own trail
+		if (body == this)
+		{
+			GD.Print($"[EnemyCycle] Enemy hit own trail at {GlobalPosition}");
+			Die();
+		}
+		// Check if the player hit this enemy's trail
+		else if (body is Player player)
+		{
+			GD.Print($"[EnemyCycle] Player hit enemy trail at {body.GlobalPosition}");
+			// Player handles their own death (with shield logic)
+			if (!player.IsShieldActive())
+			{
+				player.Die();
+			}
+		}
+		// Check if another enemy hit this enemy's trail
+		else if (body is EnemyCycle otherEnemy)
+		{
+			GD.Print($"[EnemyCycle] Enemy hit another enemy's trail at {body.GlobalPosition}");
+			otherEnemy.Die();
+		}
 	}
 
 	// ========== DEATH HANDLING ==========

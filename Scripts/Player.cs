@@ -553,6 +553,12 @@ public partial class Player : CharacterBody2D
 				Die();
 			}
 		}
+		// Check if an enemy hit the player's trail
+		else if (body is EnemyCycle enemy)
+		{
+			GD.Print($"[Player] Enemy hit player trail at {body.GlobalPosition}");
+			enemy.Die();
+		}
 	}
 
 	/// <summary>
