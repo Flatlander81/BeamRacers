@@ -641,7 +641,7 @@ public partial class Player : CharacterBody2D
 	/// <summary>
 	/// Handles player death
 	/// </summary>
-	private void Die()
+	public void Die()
 	{
 		GD.Print("═══════════════════════════════");
 		GD.Print("[Player] PLAYER DEATH");
