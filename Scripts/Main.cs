@@ -26,6 +26,7 @@ public partial class Main : Node2D
 	// Game state
 	private bool _gameStarted = false;
 	private GameManager _gameManager;
+	private TrailManager _trailManager;
 	private Player _player;
 	private Arena _arena;
 	private EnemySpawner _enemySpawner;
@@ -42,6 +43,12 @@ public partial class Main : Node2D
 
 		// Get scene layer references
 		InitializeSceneLayers();
+
+		// Initialize TrailManager (must be before player/enemies spawn)
+		_trailManager = new TrailManager();
+		_trailManager.Name = "TrailManager";
+		AddChild(_trailManager);
+		GD.Print("[Main] ✓ TrailManager initialized");
 
 		// Initialize enemy spawner
 		_enemySpawner = new EnemySpawner();

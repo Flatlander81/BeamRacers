@@ -3,6 +3,21 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>
+/// Represents a single trail wall segment with start and end points
+/// </summary>
+public struct TrailWall
+{
+	public Vector2 Start;
+	public Vector2 End;
+
+	public TrailWall(Vector2 start, Vector2 end)
+	{
+		Start = start;
+		End = end;
+	}
+}
+
+/// <summary>
 /// Centralized manager for all trail walls in the game.
 /// Handles trail rendering, collision, and cleanup.
 /// </summary>
