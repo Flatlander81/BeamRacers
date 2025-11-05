@@ -31,7 +31,8 @@ public partial class TrailManager : Node2D
 	private Dictionary<Node2D, CycleTrailData> _cycleTrails = new Dictionary<Node2D, CycleTrailData>();
 
 	// ========== CONSTANTS ==========
-	private const float TRAIL_WIDTH = 12.0f; // Must be >= cycle collision radius (10.0) to ensure hits
+	private const float TRAIL_VISUAL_WIDTH = 4.0f; // Visual trail line thickness
+	private const float TRAIL_COLLISION_WIDTH = 12.0f; // Must be >= cycle collision radius (10.0) to ensure hits
 
 	// ========== INITIALIZATION ==========
 	public override void _EnterTree()
@@ -238,7 +239,7 @@ public partial class TrailManager : Node2D
 					continue;
 
 				Vector2 closestPoint = ClosestPointOnLineSegment(position, trailData.Walls[i].Start, trailData.Walls[i].End);
-				if (position.DistanceTo(closestPoint) < TRAIL_WIDTH)
+				if (position.DistanceTo(closestPoint) < TRAIL_COLLISION_WIDTH)
 					return true;
 			}
 		}
@@ -304,7 +305,7 @@ public partial class TrailManager : Node2D
 		var line = new Line2D();
 		line.Points = new Vector2[] { wall.Start, wall.End };
 		line.DefaultColor = color;
-		line.Width = TRAIL_WIDTH;
+		line.Width = TRAIL_VISUAL_WIDTH;
 
 		var material = new CanvasItemMaterial();
 		material.BlendMode = CanvasItemMaterial.BlendModeEnum.Add;
@@ -316,7 +317,7 @@ public partial class TrailManager : Node2D
 	private void CreateCollisionForWall(TrailWall wall, Area2D collisionArea)
 	{
 		Vector2 direction = (wall.End - wall.Start).Normalized();
-		Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * (TRAIL_WIDTH / 2.0f);
+		Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * (TRAIL_COLLISION_WIDTH / 2.0f);
 
 		Vector2[] collisionPoints = new Vector2[]
 		{
