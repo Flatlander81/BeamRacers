@@ -4,8 +4,9 @@ using System;
 /// <summary>
 /// Player Light Cycle controller with movement, shield, and collision systems.
 /// Trail management delegated to TrailManager singleton.
+/// Inherits grid movement logic from GridCycle base class.
 /// </summary>
-public partial class Player : CharacterBody2D
+public partial class Player : GridCycle
 {
 	// ========== EXPORTS ==========
 	[Export] public float MoveSpeed = 200.0f;
@@ -20,10 +21,7 @@ public partial class Player : CharacterBody2D
 	private Area2D _trailCollision;
 
 	// ========== MOVEMENT STATE ==========
-	public int GridSize = 50;
 	public int GridExtent = 2000;
-	private int _currentDirection = 0; // 0=right, 1=down, 2=left, 3=up
-	private int? _queuedDirection = null;
 	private bool _inputEnabled = true;
 
 	// ========== SHIELD STATE ==========
@@ -48,24 +46,8 @@ public partial class Player : CharacterBody2D
 		_trailRenderer = GetNode<Node2D>("TrailRenderer");
 		_trailCollision = GetNode<Area2D>("TrailRenderer/TrailCollision");
 
-		// Remove old trail nodes
-		var oldTrailLine = GetNodeOrNull<Line2D>("TrailRenderer/TrailLine");
-		if (oldTrailLine != null)
-		{
-			oldTrailLine.QueueFree();
-		}
-
-		var oldCollisionShape = GetNodeOrNull<CollisionPolygon2D>("TrailRenderer/TrailCollision/TrailCollisionShape");
-		if (oldCollisionShape != null)
-		{
-			oldCollisionShape.QueueFree();
-		}
-
-		// Move trail renderer to world space
-		RemoveChild(_trailRenderer);
-		GetParent().AddChild(_trailRenderer);
-		_trailRenderer.GlobalPosition = Vector2.Zero;
-
+		// Initialize trail renderer
+		InitializeTrailRenderer(_trailRenderer);
 		GD.Print("[Player] ✓ Trail renderer moved to world space");
 
 		// Generate visuals
@@ -73,15 +55,7 @@ public partial class Player : CharacterBody2D
 		GenerateShieldGeometry();
 
 		// Register with TrailManager
-		if (TrailManager.Instance != null)
-		{
-			TrailManager.Instance.RegisterCycle(this, new Color(0, 1, 1, 0.8f), _trailRenderer, _trailCollision);
-			GD.Print("[Player] ✓ Registered with TrailManager");
-		}
-		else
-		{
-			GD.PrintErr("[Player] ERROR: TrailManager not found!");
-		}
+		RegisterWithTrailManager(new Color(0, 1, 1, 0.8f), _trailRenderer, _trailCollision, "Player");
 
 		GD.Print($"[Player] ✓ Player initialized at {GlobalPosition}");
 	}
@@ -91,28 +65,7 @@ public partial class Player : CharacterBody2D
 	/// </summary>
 	private void GenerateWedgeGeometry()
 	{
-		Vector2[] wedgeVertices = new Vector2[]
-		{
-			new Vector2(20, 0),
-			new Vector2(-10, -8),
-			new Vector2(-5, -8),
-			new Vector2(-5, 8),
-			new Vector2(-10, 8)
-		};
-
-		_bodyPolygon.Polygon = wedgeVertices;
-		_bodyPolygon.Color = new Color(0, 1, 1, 0.3f);
-
-		var material = new CanvasItemMaterial();
-		material.BlendMode = CanvasItemMaterial.BlendModeEnum.Add;
-		_bodyPolygon.Material = material;
-
-		_outlineLine.Points = wedgeVertices;
-		_outlineLine.AddPoint(wedgeVertices[0]);
-		_outlineLine.DefaultColor = new Color(0, 1, 1, 1);
-		_outlineLine.Width = 2.0f;
-		_outlineLine.Closed = true;
-
+		GenerateWedgeGeometry(_bodyPolygon, _outlineLine, new Color(0, 1, 1, 1)); // Cyan
 		GD.Print("[Player] ✓ Wedge geometry generated");
 	}
 
@@ -231,59 +184,6 @@ public partial class Player : CharacterBody2D
 		// Always move forward in current direction
 		Vector2 moveDirection = GetDirectionVector();
 		Velocity = moveDirection * MoveSpeed;
-	}
-
-	/// <summary>
-	/// Checks if player is aligned to grid for turning
-	/// </summary>
-	private bool IsAlignedToGrid()
-	{
-		if (_currentDirection == 0 || _currentDirection == 2) // Horizontal
-		{
-			float remainder = Mathf.Abs(GlobalPosition.X) % GridSize;
-			return remainder < 2.0f || remainder > (GridSize - 2.0f);
-		}
-		else // Vertical
-		{
-			float remainder = Mathf.Abs(GlobalPosition.Y) % GridSize;
-			return remainder < 2.0f || remainder > (GridSize - 2.0f);
-		}
-	}
-
-	/// <summary>
-	/// Snaps player position to nearest grid line
-	/// </summary>
-	private void SnapToGrid()
-	{
-		Vector2 snappedPos = GlobalPosition;
-		snappedPos.X = Mathf.Round(snappedPos.X / GridSize) * GridSize;
-		snappedPos.Y = Mathf.Round(snappedPos.Y / GridSize) * GridSize;
-		GlobalPosition = snappedPos;
-
-		GD.Print($"[Player] Snapped to grid: {GlobalPosition}");
-	}
-
-	/// <summary>
-	/// Gets the movement direction vector based on current direction
-	/// </summary>
-	private Vector2 GetDirectionVector()
-	{
-		return _currentDirection switch
-		{
-			0 => Vector2.Right,
-			1 => Vector2.Down,
-			2 => Vector2.Left,
-			3 => Vector2.Up,
-			_ => Vector2.Right
-		};
-	}
-
-	/// <summary>
-	/// Updates the visual rotation to match the current direction
-	/// </summary>
-	private void UpdateRotationFromDirection()
-	{
-		Rotation = _currentDirection * Mathf.Pi / 2.0f;
 	}
 
 	// ========== SHIELD SYSTEM ==========

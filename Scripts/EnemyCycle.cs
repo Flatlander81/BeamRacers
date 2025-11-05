@@ -5,8 +5,9 @@ using System;
 /// Enemy Light Cycle with grid-snapped movement, chase AI, and trail generation.
 /// Movement system identical to Player - 90-degree turns at grid lines only.
 /// Trail management delegated to TrailManager singleton.
+/// Inherits grid movement logic from GridCycle base class.
 /// </summary>
-public partial class EnemyCycle : CharacterBody2D
+public partial class EnemyCycle : GridCycle
 {
 	// ========== SIGNALS ==========
 	[Signal]
@@ -22,12 +23,7 @@ public partial class EnemyCycle : CharacterBody2D
 	private Area2D _trailCollision;
 
 	// ========== GRID PARAMETERS ==========
-	public int GridSize = 50;
 	public Rect2 ArenaBounds = new Rect2(-800, -450, 1600, 900);
-
-	// ========== MOVEMENT STATE (Grid-snapped like Player) ==========
-	private int _currentDirection = 0; // 0=right, 1=down, 2=left, 3=up
-	private int? _queuedDirection = null;
 
 	// ========== AI STATE ==========
 	private Vector2 _targetPosition = Vector2.Zero;
@@ -51,23 +47,8 @@ public partial class EnemyCycle : CharacterBody2D
 		_trailRenderer = GetNode<Node2D>("TrailRenderer");
 		_trailCollision = GetNode<Area2D>("TrailRenderer/TrailCollision");
 
-		// Remove old trail nodes
-		var oldTrailLine = GetNodeOrNull<Line2D>("TrailRenderer/TrailLine");
-		if (oldTrailLine != null)
-		{
-			oldTrailLine.QueueFree();
-		}
-
-		var oldCollisionShape = GetNodeOrNull<CollisionPolygon2D>("TrailRenderer/TrailCollision/TrailCollisionShape");
-		if (oldCollisionShape != null)
-		{
-			oldCollisionShape.QueueFree();
-		}
-
-		// Move trail renderer to world space
-		RemoveChild(_trailRenderer);
-		GetParent().AddChild(_trailRenderer);
-		_trailRenderer.GlobalPosition = Vector2.Zero;
+		// Initialize trail renderer
+		InitializeTrailRenderer(_trailRenderer);
 
 		// Generate visuals
 		GenerateWedgeGeometry();
@@ -76,15 +57,7 @@ public partial class EnemyCycle : CharacterBody2D
 		InitializeDirection();
 
 		// Register with TrailManager
-		if (TrailManager.Instance != null)
-		{
-			TrailManager.Instance.RegisterCycle(this, new Color(1, 0, 0, 0.8f), _trailRenderer, _trailCollision);
-			GD.Print("[EnemyCycle] ✓ Registered with TrailManager");
-		}
-		else
-		{
-			GD.PrintErr("[EnemyCycle] ERROR: TrailManager not found!");
-		}
+		RegisterWithTrailManager(new Color(1, 0, 0, 0.8f), _trailRenderer, _trailCollision, "EnemyCycle");
 
 		// Find player reference
 		_player = GetTree().Root.FindChild("Player", true, false) as Player;
@@ -121,28 +94,7 @@ public partial class EnemyCycle : CharacterBody2D
 	/// </summary>
 	private void GenerateWedgeGeometry()
 	{
-		Vector2[] wedgeVertices = new Vector2[]
-		{
-			new Vector2(20, 0),
-			new Vector2(-10, -8),
-			new Vector2(-5, -8),
-			new Vector2(-5, 8),
-			new Vector2(-10, 8)
-		};
-
-		_bodyPolygon.Polygon = wedgeVertices;
-		_bodyPolygon.Color = new Color(1, 0, 0, 0.3f);
-
-		var material = new CanvasItemMaterial();
-		material.BlendMode = CanvasItemMaterial.BlendModeEnum.Add;
-		_bodyPolygon.Material = material;
-
-		_outlineLine.Points = wedgeVertices;
-		_outlineLine.AddPoint(wedgeVertices[0]);
-		_outlineLine.DefaultColor = new Color(1, 0, 0, 1);
-		_outlineLine.Width = 2.0f;
-		_outlineLine.Closed = true;
-
+		GenerateWedgeGeometry(_bodyPolygon, _outlineLine, new Color(1, 0, 0, 1)); // Red
 		GD.Print("[EnemyCycle] ✓ Red wedge geometry generated");
 	}
 
@@ -303,57 +255,6 @@ public partial class EnemyCycle : CharacterBody2D
 	}
 
 	/// <summary>
-	/// Checks if enemy is aligned to grid for turning
-	/// </summary>
-	private bool IsAlignedToGrid()
-	{
-		if (_currentDirection == 0 || _currentDirection == 2) // Horizontal
-		{
-			float remainder = Mathf.Abs(GlobalPosition.X) % GridSize;
-			return remainder < 2.0f || remainder > (GridSize - 2.0f);
-		}
-		else // Vertical
-		{
-			float remainder = Mathf.Abs(GlobalPosition.Y) % GridSize;
-			return remainder < 2.0f || remainder > (GridSize - 2.0f);
-		}
-	}
-
-	/// <summary>
-	/// Snaps enemy position to nearest grid line
-	/// </summary>
-	private void SnapToGrid()
-	{
-		Vector2 snappedPos = GlobalPosition;
-		snappedPos.X = Mathf.Round(snappedPos.X / GridSize) * GridSize;
-		snappedPos.Y = Mathf.Round(snappedPos.Y / GridSize) * GridSize;
-		GlobalPosition = snappedPos;
-	}
-
-	/// <summary>
-	/// Gets the movement direction vector based on direction index
-	/// </summary>
-	private Vector2 GetDirectionVector(int direction)
-	{
-		return direction switch
-		{
-			0 => Vector2.Right,
-			1 => Vector2.Down,
-			2 => Vector2.Left,
-			3 => Vector2.Up,
-			_ => Vector2.Right
-		};
-	}
-
-	/// <summary>
-	/// Updates the visual rotation to match the current direction
-	/// </summary>
-	private void UpdateRotationFromDirection()
-	{
-		Rotation = _currentDirection * Mathf.Pi / 2.0f;
-	}
-
-	/// <summary>
 	/// Checks if enemy has left the arena boundary and dies if so
 	/// </summary>
 	private void CheckBoundary()
@@ -412,6 +313,19 @@ public partial class EnemyCycle : CharacterBody2D
 		// Emit signal
 		EmitSignal(SignalName.OnEnemyDied);
 
+		// Clean up trail resources
+		CleanupTrailResources();
+
+		// Remove this enemy
+		QueueFree();
+	}
+
+	// ========== CLEANUP ==========
+	/// <summary>
+	/// Cleans up trail resources (unregister from TrailManager and free trail renderer)
+	/// </summary>
+	private void CleanupTrailResources()
+	{
 		// Unregister from TrailManager
 		TrailManager.Instance?.UnregisterCycle(this);
 
@@ -420,20 +334,10 @@ public partial class EnemyCycle : CharacterBody2D
 		{
 			_trailRenderer.QueueFree();
 		}
-
-		// Remove this enemy
-		QueueFree();
 	}
 
-	// ========== CLEANUP ==========
 	public override void _ExitTree()
 	{
-		TrailManager.Instance?.UnregisterCycle(this);
-
-		// Clean up trail renderer if it still exists
-		if (_trailRenderer != null && IsInstanceValid(_trailRenderer))
-		{
-			_trailRenderer.QueueFree();
-		}
+		CleanupTrailResources();
 	}
 }

@@ -176,54 +176,28 @@ public partial class Arena : Node2D
 	private void GenerateBoundaries(Vector2 arenaSize)
 	{
 		// Clear existing boundaries
-		foreach (Node child in _boundaries.GetChildren())
-		{
-			child.QueueFree();
-		}
+		ClearAllChildren(_boundaries);
 
 		float halfWidth = arenaSize.X / 2;
 		float halfHeight = arenaSize.Y / 2;
 		float wallThickness = 10.0f;
 
-		// Top wall
-		var topWall = CreateBoundaryWall(
-			new Vector2(0, -halfHeight),
-			arenaSize.X,
-			wallThickness,
-			true // horizontal
-		);
-		topWall.Name = "TopWall";
-		_boundaries.AddChild(topWall);
+		// Define wall configurations (name, position, width, height, isHorizontal)
+		var wallConfigs = new[]
+		{
+			("TopWall", new Vector2(0, -halfHeight), arenaSize.X, wallThickness, true),
+			("BottomWall", new Vector2(0, halfHeight), arenaSize.X, wallThickness, true),
+			("LeftWall", new Vector2(-halfWidth, 0), wallThickness, arenaSize.Y, false),
+			("RightWall", new Vector2(halfWidth, 0), wallThickness, arenaSize.Y, false)
+		};
 
-		// Bottom wall
-		var bottomWall = CreateBoundaryWall(
-			new Vector2(0, halfHeight),
-			arenaSize.X,
-			wallThickness,
-			true // horizontal
-		);
-		bottomWall.Name = "BottomWall";
-		_boundaries.AddChild(bottomWall);
-
-		// Left wall
-		var leftWall = CreateBoundaryWall(
-			new Vector2(-halfWidth, 0),
-			wallThickness,
-			arenaSize.Y,
-			false // vertical
-		);
-		leftWall.Name = "LeftWall";
-		_boundaries.AddChild(leftWall);
-
-		// Right wall
-		var rightWall = CreateBoundaryWall(
-			new Vector2(halfWidth, 0),
-			wallThickness,
-			arenaSize.Y,
-			false // vertical
-		);
-		rightWall.Name = "RightWall";
-		_boundaries.AddChild(rightWall);
+		// Create all walls using loop
+		foreach (var (name, position, width, height, isHorizontal) in wallConfigs)
+		{
+			var wall = CreateBoundaryWall(position, width, height, isHorizontal);
+			wall.Name = name;
+			_boundaries.AddChild(wall);
+		}
 
 		GD.Print($"[Arena] ✓ Generated boundaries ({arenaSize.X}x{arenaSize.Y}) with collision");
 	}
@@ -365,44 +339,11 @@ public partial class Arena : Node2D
 	{
 		GD.Print($"\n[Arena] ═══ GENERATING ARENA FOR ROOM {roomNumber} ═══");
 
-		// Clear existing obstacles
-		ClearObstacles();
-
 		// Select template based on room number
 		ArenaTemplate selectedTemplate = SelectTemplate(roomNumber);
-		_currentTemplate = selectedTemplate;
 
-		// Apply random rotation (0°, 90°, 180°, 270°)
-		float[] possibleRotations = { 0, Mathf.Pi / 2, Mathf.Pi, 3 * Mathf.Pi / 2 };
-		float arenaRotation = possibleRotations[_random.Next(possibleRotations.Length)];
-
-		// Apply size scale
-		_currentScale = sizeScale;
-		Vector2 scaledSize = _arenaSize * sizeScale;
-
-		// Generate boundaries
-		GenerateBoundaries(scaledSize);
-
-		// Spawn obstacles with rotation
-		foreach (var obstacleDef in selectedTemplate.Obstacles)
-		{
-			// Create a rotated copy of the obstacle
-			var rotatedObstacle = new ObstacleDefinition(
-				obstacleDef.ObstacleType,
-				RotatePoint(obstacleDef.Position, arenaRotation),
-				obstacleDef.Size,
-				obstacleDef.Rotation + arenaRotation
-			);
-			SpawnObstacle(rotatedObstacle);
-		}
-
-		GD.Print($"[Arena] Generated arena: \"{selectedTemplate.Name}\", {selectedTemplate.Obstacles.Count} obstacles");
-		GD.Print($"[Arena] Arena size: {scaledSize.X}x{scaledSize.Y}, scale: {sizeScale:F2}");
-		GD.Print($"[Arena] Rotation: {arenaRotation * 180 / Mathf.Pi:F0}°");
-		GD.Print("[Arena] ═══════════════════════════════════\n");
-
-		// Trigger redraw for grid
-		QueueRedraw();
+		// Generate arena with selected template
+		GenerateArenaFromTemplate(selectedTemplate, sizeScale);
 	}
 
 	/// <summary>
@@ -421,11 +362,24 @@ public partial class Arena : Node2D
 
 		GD.Print($"\n[Arena] ═══ GENERATING SPECIFIC ARENA (INDEX {templateIndex}) ═══");
 
+		// Get the specific template
+		ArenaTemplate selectedTemplate = _templates[templateIndex];
+
+		// Generate arena with selected template
+		GenerateArenaFromTemplate(selectedTemplate, sizeScale);
+	}
+
+	/// <summary>
+	/// Core arena generation logic used by both GenerateArena and GenerateArenaByTemplate
+	/// </summary>
+	/// <param name="selectedTemplate">The arena template to generate</param>
+	/// <param name="sizeScale">Scale factor for arena size</param>
+	private void GenerateArenaFromTemplate(ArenaTemplate selectedTemplate, float sizeScale)
+	{
 		// Clear existing obstacles
 		ClearObstacles();
 
-		// Get the specific template
-		ArenaTemplate selectedTemplate = _templates[templateIndex];
+		// Store current template
 		_currentTemplate = selectedTemplate;
 
 		// Apply random rotation (0°, 90°, 180°, 270°)
@@ -618,14 +572,22 @@ public partial class Arena : Node2D
 	}
 
 	/// <summary>
+	/// Generic helper to clear all children from a parent node
+	/// </summary>
+	private void ClearAllChildren(Node parent)
+	{
+		foreach (Node child in parent.GetChildren())
+		{
+			child.QueueFree();
+		}
+	}
+
+	/// <summary>
 	/// Clear all obstacles from the arena
 	/// </summary>
 	private void ClearObstacles()
 	{
-		foreach (Node child in _obstacles.GetChildren())
-		{
-			child.QueueFree();
-		}
+		ClearAllChildren(_obstacles);
 	}
 
 	/// <summary>

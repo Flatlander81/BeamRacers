@@ -232,17 +232,7 @@ public partial class TrailManager : Node2D
 			return;
 
 		// Clear existing trail lines
-		var childrenToRemove = new List<Node>();
-		foreach (Node child in trailData.TrailRenderer.GetChildren())
-		{
-			if (child is Line2D)
-				childrenToRemove.Add(child);
-		}
-		foreach (Node child in childrenToRemove)
-		{
-			trailData.TrailRenderer.RemoveChild(child);
-			child.QueueFree();
-		}
+		ClearChildrenOfType<Line2D>(trailData.TrailRenderer, removeBeforeFreeing: true);
 
 		// Render all completed walls
 		foreach (var wall in trailData.Walls)
@@ -268,14 +258,7 @@ public partial class TrailManager : Node2D
 			return;
 
 		// Clear existing collision shapes
-		foreach (Node child in trailData.TrailCollision.GetChildren())
-		{
-			if (child is CollisionPolygon2D)
-			{
-				trailData.TrailCollision.RemoveChild(child);
-				child.QueueFree();
-			}
-		}
+		ClearChildrenOfType<CollisionPolygon2D>(trailData.TrailCollision, removeBeforeFreeing: true);
 
 		// Create collision shape for each wall (except the most recent one)
 		for (int i = 0; i < trailData.Walls.Count; i++)
@@ -322,27 +305,47 @@ public partial class TrailManager : Node2D
 		collisionArea.AddChild(collisionShape);
 	}
 
+	/// <summary>
+	/// Generic helper to clear all children of a specific type from a parent node
+	/// </summary>
+	private void ClearChildrenOfType<T>(Node parent, bool removeBeforeFreeing = false) where T : Node
+	{
+		if (parent == null || !IsInstanceValid(parent))
+			return;
+
+		if (removeBeforeFreeing)
+		{
+			// Two-step process: collect, then remove and free
+			var childrenToRemove = new List<Node>();
+			foreach (Node child in parent.GetChildren())
+			{
+				if (child is T)
+					childrenToRemove.Add(child);
+			}
+			foreach (Node child in childrenToRemove)
+			{
+				parent.RemoveChild(child);
+				child.QueueFree();
+			}
+		}
+		else
+		{
+			// Direct queue free
+			foreach (Node child in parent.GetChildren())
+			{
+				if (child is T)
+					child.QueueFree();
+			}
+		}
+	}
+
 	private void ClearCycleTrails(CycleTrailData trailData)
 	{
 		// Clear trail visuals
-		if (trailData.TrailRenderer != null && IsInstanceValid(trailData.TrailRenderer))
-		{
-			foreach (Node child in trailData.TrailRenderer.GetChildren())
-			{
-				if (child is Line2D)
-					child.QueueFree();
-			}
-		}
+		ClearChildrenOfType<Line2D>(trailData.TrailRenderer);
 
 		// Clear collision shapes
-		if (trailData.TrailCollision != null && IsInstanceValid(trailData.TrailCollision))
-		{
-			foreach (Node child in trailData.TrailCollision.GetChildren())
-			{
-				if (child is CollisionPolygon2D)
-					child.QueueFree();
-			}
-		}
+		ClearChildrenOfType<CollisionPolygon2D>(trailData.TrailCollision);
 	}
 
 	private Vector2 ClosestPointOnLineSegment(Vector2 point, Vector2 lineStart, Vector2 lineEnd)
