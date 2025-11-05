@@ -152,7 +152,18 @@ public partial class TrailManager : Node2D
 		float timeSinceTurn = Time.GetTicksMsec() / 1000f - trailData.LastTurnTime;
 		float distanceFromTurn = collisionPosition.DistanceTo(trailData.LastTurnPosition);
 
-		return timeSinceTurn < 0.1f && distanceFromTurn < 15f;
+		if (timeSinceTurn < 0.1f && distanceFromTurn < 15f)
+			return true;
+
+		// Also ignore collision very close to current position (trailing edge of current wall)
+		if (trailData.Owner != null && IsInstanceValid(trailData.Owner))
+		{
+			float distanceFromCurrent = collisionPosition.DistanceTo(trailData.Owner.GlobalPosition);
+			if (distanceFromCurrent < 15f)
+				return true;
+		}
+
+		return false;
 	}
 
 	/// <summary>
@@ -294,6 +305,18 @@ public partial class TrailManager : Node2D
 		for (int i = 0; i < trailData.Walls.Count; i++)
 		{
 			CreateCollisionForWall(trailData.Walls[i], trailData.TrailCollision);
+		}
+
+		// CRITICAL: Create collision for the current wall being laid
+		// This ensures cycles can't drive along the actively-being-drawn trail
+		if (trailData.HasWallStart && trailData.Owner != null && IsInstanceValid(trailData.Owner))
+		{
+			Vector2 currentPos = trailData.Owner.GlobalPosition;
+			if (currentPos.DistanceTo(trailData.CurrentWallStart) > 1.0f)
+			{
+				var currentWall = new TrailWall(trailData.CurrentWallStart, currentPos);
+				CreateCollisionForWall(currentWall, trailData.TrailCollision);
+			}
 		}
 	}
 
