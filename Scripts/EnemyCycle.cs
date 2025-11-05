@@ -270,12 +270,18 @@ public partial class EnemyCycle : GridCycle
 		Vector2 directionVector = GetDirectionVector();
 		Vector2 checkPosition = GlobalPosition + directionVector * (GridSize / 2.0f);
 
+		// Debug logging
+		Vector2I currentGrid = GridCollisionManager.Instance.WorldToGrid(GlobalPosition);
+		Vector2I checkGrid = GridCollisionManager.Instance.WorldToGrid(checkPosition);
+		GD.Print($"[Enemy] Collision Check: pos={GlobalPosition} (grid {currentGrid}), checking ahead at {checkPosition} (grid {checkGrid}), dir={_currentDirection}");
+
 		CellOccupant occupant = GridCollisionManager.Instance.GetCell(checkPosition);
 
 		// Check if we hit anything that would kill us
 		if (occupant != CellOccupant.Empty)
 		{
-			GD.Print($"[EnemyCycle] Hit {occupant} at {checkPosition}");
+			GD.Print($"[Enemy] ⚠ COLLISION DETECTED: {occupant} at {checkPosition} (grid {checkGrid})");
+			GD.Print($"[Enemy] ☠ DEATH: Hit {occupant} at {checkPosition}");
 			Die();
 		}
 	}

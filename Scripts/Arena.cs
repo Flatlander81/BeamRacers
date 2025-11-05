@@ -165,6 +165,16 @@ public partial class Arena : Node2D
 		scattered.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Pillar, new Vector2(380, -320), 30));
 		_templates.Add(scattered);
 
+		// Template 6: "COLLISION TEST" - Forces specific collision scenarios for debugging
+		var collisionTest = new ArenaTemplate("Collision Test Arena", 0.1f);
+		// Create a narrow corridor forcing tight turns
+		// Player spawns at (0,0), corridor is 200 units wide (4 grid cells)
+		collisionTest.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-300, -100), 400, 0));  // Top wall
+		collisionTest.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-300, 100), 400, 0));   // Bottom wall
+		collisionTest.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-500, 0), 200, Mathf.Pi / 2));  // Left wall
+		// Right side is open so player can enter the corridor and make sharp turns
+		_templates.Add(collisionTest);
+
 		GD.Print($"[Arena] ✓ Created {_templates.Count} arena templates");
 	}
 

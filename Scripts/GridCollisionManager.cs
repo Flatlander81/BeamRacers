@@ -27,6 +27,9 @@ public partial class GridCollisionManager : Node
 	private Dictionary<Vector2I, CellOccupant> _grid = new Dictionary<Vector2I, CellOccupant>();
 	private int _gridSize = 50;
 
+	// ========== DEBUG LOGGING ==========
+	private bool _verboseLogging = true;  // Set to false to reduce log spam
+
 	// ========== INITIALIZATION ==========
 	public override void _EnterTree()
 	{
@@ -81,10 +84,23 @@ public partial class GridCollisionManager : Node
 	{
 		if (occupant == CellOccupant.Empty)
 		{
+			if (_verboseLogging && _grid.ContainsKey(gridPos))
+			{
+				CellOccupant previous = _grid[gridPos];
+				GD.Print($"[GridCollision] CLEAR cell {gridPos} (was {previous})");
+			}
 			_grid.Remove(gridPos);
 		}
 		else
 		{
+			if (_verboseLogging)
+			{
+				CellOccupant previous = _grid.TryGetValue(gridPos, out var prev) ? prev : CellOccupant.Empty;
+				if (previous != occupant)
+				{
+					GD.Print($"[GridCollision] SET cell {gridPos} = {occupant} (was {previous})");
+				}
+			}
 			_grid[gridPos] = occupant;
 		}
 	}
@@ -110,7 +126,15 @@ public partial class GridCollisionManager : Node
 	/// </summary>
 	public CellOccupant GetCell(Vector2 worldPos)
 	{
-		return GetCell(WorldToGrid(worldPos));
+		Vector2I gridPos = WorldToGrid(worldPos);
+		CellOccupant occupant = GetCell(gridPos);
+
+		if (_verboseLogging && occupant != CellOccupant.Empty)
+		{
+			GD.Print($"[GridCollision] GET cell at world {worldPos} (grid {gridPos}) = {occupant}");
+		}
+
+		return occupant;
 	}
 
 	/// <summary>
@@ -122,6 +146,12 @@ public partial class GridCollisionManager : Node
 		Vector2I gridStart = WorldToGrid(start);
 		Vector2I gridEnd = WorldToGrid(end);
 
+		if (_verboseLogging)
+		{
+			float distance = start.DistanceTo(end);
+			GD.Print($"[GridCollision] SET LINE from {start} (grid {gridStart}) to {end} (grid {gridEnd}) = {occupant} (dist: {distance:F1})");
+		}
+
 		// Bresenham's line algorithm
 		int dx = Mathf.Abs(gridEnd.X - gridStart.X);
 		int dy = Mathf.Abs(gridEnd.Y - gridStart.Y);
@@ -130,10 +160,12 @@ public partial class GridCollisionManager : Node
 		int err = dx - dy;
 
 		Vector2I current = gridStart;
+		int cellCount = 0;
 
 		while (true)
 		{
 			SetCell(current, occupant);
+			cellCount++;
 
 			if (current == gridEnd)
 				break;
@@ -149,6 +181,11 @@ public partial class GridCollisionManager : Node
 				err += dx;
 				current.Y += sy;
 			}
+		}
+
+		if (_verboseLogging)
+		{
+			GD.Print($"[GridCollision]   → Marked {cellCount} cells");
 		}
 	}
 

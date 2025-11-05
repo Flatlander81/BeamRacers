@@ -36,6 +36,11 @@ public partial class Player : GridCycle
 	// ========== DEBUG ==========
 	private int _frameCounter = 0;
 
+	// ========== AUTOMATED TEST MODE ==========
+	private bool _autoTestMode = false;
+	private float _autoTestTimer = 0.0f;
+	private int _autoTestStep = 0;
+
 	// ========== INITIALIZATION ==========
 	public override void _Ready()
 	{
@@ -151,16 +156,24 @@ public partial class Player : GridCycle
 		Vector2 directionVector = GetDirectionVector();
 		Vector2 checkPosition = GlobalPosition + directionVector * (GridSize / 2.0f);
 
+		// Debug logging
+		Vector2I currentGrid = GridCollisionManager.Instance.WorldToGrid(GlobalPosition);
+		Vector2I checkGrid = GridCollisionManager.Instance.WorldToGrid(checkPosition);
+		GD.Print($"[Player] Collision Check: pos={GlobalPosition} (grid {currentGrid}), checking ahead at {checkPosition} (grid {checkGrid}), dir={_currentDirection}");
+
 		CellOccupant occupant = GridCollisionManager.Instance.GetCell(checkPosition);
 
 		// Check if we hit anything
 		if (occupant != CellOccupant.Empty)
 		{
+			GD.Print($"[Player] ⚠ COLLISION DETECTED: {occupant} at {checkPosition} (grid {checkGrid})");
+
 			// Handle shield absorption
 			if (occupant == CellOccupant.PlayerTrail && _shieldState == ShieldState.Active)
 			{
 				if (!_shieldBrokeTrailThisActivation)
 				{
+					GD.Print($"[Player] 🛡 Shield absorbing collision with PlayerTrail");
 					TrailManager.Instance?.BreakClosestWall(GlobalPosition, this);
 					_shieldBrokeTrailThisActivation = true;
 					GD.Print("[Player] Shield absorbed trail collision!");
@@ -169,7 +182,7 @@ public partial class Player : GridCycle
 			}
 
 			// Otherwise, player dies
-			GD.Print($"[Player] Hit {occupant} at {checkPosition}");
+			GD.Print($"[Player] ☠ DEATH: Hit {occupant} at {checkPosition} (grid {checkGrid})");
 			Die();
 		}
 	}
@@ -193,14 +206,22 @@ public partial class Player : GridCycle
 	/// </summary>
 	private void ProcessMovement(float delta)
 	{
-		// Queue turn input
-		if (Input.IsActionJustPressed("move_left") && _queuedDirection == null)
+		// Handle automated test mode
+		if (_autoTestMode)
 		{
-			_queuedDirection = (_currentDirection + 3) % 4;
+			ProcessAutomatedTest(delta);
 		}
-		else if (Input.IsActionJustPressed("move_right") && _queuedDirection == null)
+		else
 		{
-			_queuedDirection = (_currentDirection + 1) % 4;
+			// Queue turn input (normal player control)
+			if (Input.IsActionJustPressed("move_left") && _queuedDirection == null)
+			{
+				_queuedDirection = (_currentDirection + 3) % 4;
+			}
+			else if (Input.IsActionJustPressed("move_right") && _queuedDirection == null)
+			{
+				_queuedDirection = (_currentDirection + 1) % 4;
+			}
 		}
 
 		// Check if we can execute queued turn (grid-aligned)
@@ -223,6 +244,77 @@ public partial class Player : GridCycle
 		// Always move forward in current direction
 		Vector2 moveDirection = GetDirectionVector();
 		Velocity = moveDirection * MoveSpeed;
+	}
+
+	/// <summary>
+	/// Automated test sequence to trigger collision scenarios
+	/// </summary>
+	private void ProcessAutomatedTest(float delta)
+	{
+		_autoTestTimer += delta;
+
+		// Test sequence: Move in a pattern that creates rapid turns
+		// This is designed to test collision detection with our own trail
+		switch (_autoTestStep)
+		{
+			case 0: // Initial: Move left for 1.5 seconds
+				if (_autoTestTimer > 1.5f && _queuedDirection == null)
+				{
+					GD.Print("[AutoTest] Step 0 → 1: Turning LEFT");
+					_queuedDirection = (_currentDirection + 3) % 4; // Turn left
+					_autoTestTimer = 0.0f;
+					_autoTestStep = 1;
+				}
+				break;
+
+			case 1: // After 0.5 seconds, turn left again (rapid double turn)
+				if (_autoTestTimer > 0.5f && _queuedDirection == null)
+				{
+					GD.Print("[AutoTest] Step 1 → 2: Turning LEFT AGAIN (rapid double-turn test)");
+					_queuedDirection = (_currentDirection + 3) % 4; // Turn left again
+					_autoTestTimer = 0.0f;
+					_autoTestStep = 2;
+				}
+				break;
+
+			case 2: // Move for 1.0 seconds
+				if (_autoTestTimer > 1.0f && _queuedDirection == null)
+				{
+					GD.Print("[AutoTest] Step 2 → 3: Turning LEFT (starting box pattern)");
+					_queuedDirection = (_currentDirection + 3) % 4;
+					_autoTestTimer = 0.0f;
+					_autoTestStep = 3;
+				}
+				break;
+
+			case 3: // Complete a square to cross our own trail
+				if (_autoTestTimer > 1.0f && _queuedDirection == null)
+				{
+					GD.Print("[AutoTest] Step 3 → 4: Turning LEFT (continuing box)");
+					_queuedDirection = (_currentDirection + 3) % 4;
+					_autoTestTimer = 0.0f;
+					_autoTestStep = 4;
+				}
+				break;
+
+			case 4: // Final turn to attempt crossing our trail
+				if (_autoTestTimer > 1.0f && _queuedDirection == null)
+				{
+					GD.Print("[AutoTest] Step 4 → 5: Turning LEFT (should cross trail soon)");
+					_queuedDirection = (_currentDirection + 3) % 4;
+					_autoTestTimer = 0.0f;
+					_autoTestStep = 5;
+				}
+				break;
+
+			case 5: // Let it run to see if collision detection works
+				if (_autoTestTimer > 2.0f)
+				{
+					GD.Print("[AutoTest] Test sequence complete - Collision should have occurred or system is working");
+					_autoTestMode = false;
+				}
+				break;
+		}
 	}
 
 	// ========== SHIELD SYSTEM ==========

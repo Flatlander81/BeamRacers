@@ -479,6 +479,16 @@ public partial class Main : Node2D
 					_arena.GenerateProceduralArena(); // Procedural (random each time)
 					GD.Print("[Main] ⚡ F6 pressed - Generating PROCEDURAL arena (random)");
 					break;
+				case Key.F7:
+					_arena.GenerateArenaByTemplate(5); // Collision Test Arena
+					GD.Print("[Main] ⚡ F7 pressed - Loading 'Collision Test' arena (DEBUG MODE)");
+					// Enable automated test mode if available
+					if (_player != null)
+					{
+						_player.Set("_autoTestMode", true);
+						GD.Print("[Main] 🤖 Automated test mode ENABLED");
+					}
+					break;
 			}
 		}
 	}
