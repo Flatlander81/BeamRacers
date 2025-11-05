@@ -286,6 +286,13 @@ public partial class EnemyCycle : GridCycle
 		// Check if this enemy hit its own trail
 		if (body == this)
 		{
+			// Grace period: Ignore self-collision if we just turned at this position
+			if (TrailManager.Instance != null && TrailManager.Instance.IsWithinTurnGracePeriod(this, GlobalPosition))
+			{
+				GD.Print($"[EnemyCycle] Self-collision ignored (turn grace period)");
+				return;
+			}
+
 			GD.Print($"[EnemyCycle] Enemy hit own trail at {GlobalPosition}");
 			Die();
 		}

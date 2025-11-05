@@ -272,6 +272,13 @@ public partial class Player : GridCycle
 		// Check if it's the player hitting their own trail
 		if (body == this)
 		{
+			// Grace period: Ignore self-collision if we just turned at this position
+			if (TrailManager.Instance != null && TrailManager.Instance.IsWithinTurnGracePeriod(this, GlobalPosition))
+			{
+				GD.Print($"[Player] Self-collision ignored (turn grace period)");
+				return;
+			}
+
 			if (_shieldState == ShieldState.Active)
 			{
 				if (!_shieldBrokeTrailThisActivation)

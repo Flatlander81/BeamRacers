@@ -74,7 +74,9 @@ public partial class TrailManager : Node2D
 			Walls = new List<TrailWall>(),
 			CurrentWallStart = cycle.GlobalPosition,
 			HasWallStart = true,
-			LastWallIndex = -1
+			LastWallIndex = -1,
+			LastTurnPosition = Vector2.Zero,
+			LastTurnTime = 0f
 		};
 
 		_cycleTrails[cycle] = trailData;
@@ -117,6 +119,10 @@ public partial class TrailManager : Node2D
 		trailData.CurrentWallStart = turnPosition;
 		trailData.HasWallStart = true;
 
+		// Track turn position and time for grace period
+		trailData.LastTurnPosition = turnPosition;
+		trailData.LastTurnTime = Time.GetTicksMsec() / 1000f;
+
 		// Update visuals and collision
 		UpdateTrailVisual(trailData);
 		UpdateTrailCollision(trailData);
@@ -131,6 +137,21 @@ public partial class TrailManager : Node2D
 			return;
 
 		UpdateTrailVisual(trailData);
+	}
+
+	/// <summary>
+	/// Checks if a cycle is within the grace period after turning (to prevent immediate self-collision)
+	/// </summary>
+	public bool IsWithinTurnGracePeriod(Node2D cycle, Vector2 collisionPosition)
+	{
+		if (!_cycleTrails.TryGetValue(cycle, out var trailData))
+			return false;
+
+		// Grace period: 0.1 seconds and within 15 units of the last turn position
+		float timeSinceTurn = Time.GetTicksMsec() / 1000f - trailData.LastTurnTime;
+		float distanceFromTurn = collisionPosition.DistanceTo(trailData.LastTurnPosition);
+
+		return timeSinceTurn < 0.1f && distanceFromTurn < 15f;
 	}
 
 	/// <summary>
@@ -386,5 +407,7 @@ public partial class TrailManager : Node2D
 		public Vector2 CurrentWallStart;
 		public bool HasWallStart;
 		public int LastWallIndex;
+		public Vector2 LastTurnPosition;
+		public float LastTurnTime;
 	}
 }
