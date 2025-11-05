@@ -267,12 +267,10 @@ public partial class TrailManager : Node2D
 		// Clear existing collision shapes
 		ClearChildrenOfType<CollisionPolygon2D>(trailData.TrailCollision, removeBeforeFreeing: true);
 
-		// Create collision shape for each wall (except the most recent one)
+		// FIXED: Create collision shape for ALL walls - no exceptions!
+		// Any cycle body hitting any trail wall should cause a collision
 		for (int i = 0; i < trailData.Walls.Count; i++)
 		{
-			if (i == trailData.LastWallIndex)
-				continue;
-
 			CreateCollisionForWall(trailData.Walls[i], trailData.TrailCollision);
 		}
 	}
