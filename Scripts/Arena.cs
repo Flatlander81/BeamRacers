@@ -351,7 +351,8 @@ public partial class Arena : Node2D
 	/// </summary>
 	/// <param name="templateIndex">Template index (0-4): 0=The Box, 1=Four Pillars, 2=The Cross, 3=The Ring, 4=Scattered</param>
 	/// <param name="sizeScale">Scale factor for arena size (default 1.0)</param>
-	public void GenerateArenaByTemplate(int templateIndex, float sizeScale = 1.0f)
+	/// <param name="forceNoRotation">If true, disables random arena rotation (default false)</param>
+	public void GenerateArenaByTemplate(int templateIndex, float sizeScale = 1.0f, bool forceNoRotation = false)
 	{
 		// Validate template index
 		if (templateIndex < 0 || templateIndex >= _templates.Count)
@@ -366,7 +367,7 @@ public partial class Arena : Node2D
 		ArenaTemplate selectedTemplate = _templates[templateIndex];
 
 		// Generate arena with selected template
-		GenerateArenaFromTemplate(selectedTemplate, sizeScale);
+		GenerateArenaFromTemplate(selectedTemplate, sizeScale, forceNoRotation);
 	}
 
 	/// <summary>
@@ -374,7 +375,8 @@ public partial class Arena : Node2D
 	/// </summary>
 	/// <param name="selectedTemplate">The arena template to generate</param>
 	/// <param name="sizeScale">Scale factor for arena size</param>
-	private void GenerateArenaFromTemplate(ArenaTemplate selectedTemplate, float sizeScale)
+	/// <param name="forceNoRotation">If true, disables random arena rotation</param>
+	private void GenerateArenaFromTemplate(ArenaTemplate selectedTemplate, float sizeScale, bool forceNoRotation = false)
 	{
 		// Clear existing obstacles
 		ClearObstacles();
@@ -382,9 +384,9 @@ public partial class Arena : Node2D
 		// Store current template
 		_currentTemplate = selectedTemplate;
 
-		// Apply random rotation (0°, 90°, 180°, 270°) - SKIP for collision test arena
+		// Apply random rotation (0°, 90°, 180°, 270°) - can be disabled via parameter
 		float arenaRotation = 0f;
-		if (selectedTemplate.Name != "Collision Test Arena")
+		if (!forceNoRotation)
 		{
 			float[] possibleRotations = { 0, Mathf.Pi / 2, Mathf.Pi, 3 * Mathf.Pi / 2 };
 			arenaRotation = possibleRotations[_random.Next(possibleRotations.Length)];
