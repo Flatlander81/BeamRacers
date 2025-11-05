@@ -26,8 +26,10 @@ public partial class Main : Node2D
 	// Game state
 	private bool _gameStarted = false;
 	private GameManager _gameManager;
+	private TrailManager _trailManager;
 	private Player _player;
 	private Arena _arena;
+	private EnemySpawner _enemySpawner;
 
 	public override void _Ready()
 	{
@@ -42,6 +44,18 @@ public partial class Main : Node2D
 		// Get scene layer references
 		InitializeSceneLayers();
 
+		// Initialize TrailManager (must be before player/enemies spawn)
+		_trailManager = new TrailManager();
+		_trailManager.Name = "TrailManager";
+		AddChild(_trailManager);
+		GD.Print("[Main] ✓ TrailManager initialized");
+
+		// Initialize enemy spawner
+		_enemySpawner = new EnemySpawner();
+		_enemySpawner.Name = "EnemySpawner";
+		AddChild(_enemySpawner);
+		GD.Print("[Main] ✓ EnemySpawner initialized");
+
 		// Create the start screen UI
 		CreateStartScreen();
 
@@ -53,67 +67,42 @@ public partial class Main : Node2D
 	/// <summary>
 	/// Initializes or retrieves references to the main scene layers
 	/// </summary>
+	/// <summary>
+	/// Generic helper to initialize or find a layer node
+	/// </summary>
+	private T InitializeLayer<T>(ref T field, string nodeName, Action<T> configure = null, string createdMessage = null) where T : Node, new()
+	{
+		field = GetNodeOrNull<T>(nodeName);
+		if (field == null)
+		{
+			field = new T();
+			field.Name = nodeName;
+			configure?.Invoke(field);
+			AddChild(field);
+			GD.Print($"[Main] ✓ {nodeName} created{(createdMessage != null ? $" ({createdMessage})" : "")}");
+		}
+		else
+		{
+			GD.Print($"[Main] ✓ {nodeName} found");
+		}
+		return field;
+	}
+
 	private void InitializeSceneLayers()
 	{
-		// Camera2D
-		_camera = GetNodeOrNull<Camera2D>("Camera2D");
-		if (_camera == null)
+		// Camera2D with custom configuration
+		InitializeLayer(ref _camera, "Camera2D", camera =>
 		{
-			_camera = new Camera2D();
-			_camera.Name = "Camera2D";
-			_camera.Enabled = true;
-			_camera.Zoom = Vector2.One;
-			_camera.PositionSmoothingEnabled = true;
-			_camera.PositionSmoothingSpeed = 5.0f;
-			AddChild(_camera);
-			GD.Print("[Main] ✓ Camera2D created (zoom: 1.0, smoothing: enabled)");
-		}
-		else
-		{
-			GD.Print("[Main] ✓ Camera2D found");
-		}
+			camera.Enabled = true;
+			camera.Zoom = Vector2.One;
+			camera.PositionSmoothingEnabled = true;
+			camera.PositionSmoothingSpeed = 5.0f;
+		}, "zoom: 1.0, smoothing: enabled");
 
-		// GameLayer
-		_gameLayer = GetNodeOrNull<Node2D>("GameLayer");
-		if (_gameLayer == null)
-		{
-			_gameLayer = new Node2D();
-			_gameLayer.Name = "GameLayer";
-			AddChild(_gameLayer);
-			GD.Print("[Main] ✓ GameLayer created");
-		}
-		else
-		{
-			GD.Print("[Main] ✓ GameLayer found");
-		}
-
-		// UILayer
-		_uiLayer = GetNodeOrNull<CanvasLayer>("UILayer");
-		if (_uiLayer == null)
-		{
-			_uiLayer = new CanvasLayer();
-			_uiLayer.Name = "UILayer";
-			AddChild(_uiLayer);
-			GD.Print("[Main] ✓ UILayer created");
-		}
-		else
-		{
-			GD.Print("[Main] ✓ UILayer found");
-		}
-
-		// EffectsLayer
-		_effectsLayer = GetNodeOrNull<Node2D>("EffectsLayer");
-		if (_effectsLayer == null)
-		{
-			_effectsLayer = new Node2D();
-			_effectsLayer.Name = "EffectsLayer";
-			AddChild(_effectsLayer);
-			GD.Print("[Main] ✓ EffectsLayer created");
-		}
-		else
-		{
-			GD.Print("[Main] ✓ EffectsLayer found");
-		}
+		// Simple layers
+		InitializeLayer(ref _gameLayer, "GameLayer");
+		InitializeLayer(ref _uiLayer, "UILayer");
+		InitializeLayer(ref _effectsLayer, "EffectsLayer");
 	}
 
 	/// <summary>
@@ -200,6 +189,9 @@ public partial class Main : Node2D
 
 		// Spawn the player
 		SpawnPlayer();
+
+		// Spawn enemies after player and arena are ready
+		SpawnEnemies();
 
 		GD.Print("[Main] ✓ Game start sequence complete\n");
 	}
@@ -378,6 +370,50 @@ public partial class Main : Node2D
 			_arena.GenerateArena(1);
 			GD.Print("[Main] ✓ Arena spawned and generated (default room 1)");
 		}
+	}
+
+	/// <summary>
+	/// Spawns enemies for the current room
+	/// </summary>
+	private void SpawnEnemies()
+	{
+		if (_enemySpawner == null)
+		{
+			GD.PrintErr("[Main] ERROR: EnemySpawner not initialized!");
+			return;
+		}
+
+		if (_player == null)
+		{
+			GD.PrintErr("[Main] ERROR: Cannot spawn enemies - Player not found!");
+			return;
+		}
+
+		if (_gameManager == null)
+		{
+			GD.PrintErr("[Main] ERROR: Cannot spawn enemies - GameManager not found!");
+			return;
+		}
+
+		if (_arena == null)
+		{
+			GD.PrintErr("[Main] ERROR: Cannot spawn enemies - Arena not found!");
+			return;
+		}
+
+		// Get arena bounds
+		Rect2 arenaBounds = _arena.GetArenaBounds();
+
+		// Spawn enemies for current room
+		_enemySpawner.SpawnEnemies(
+			_gameManager.CurrentRoom,
+			_player.GlobalPosition,
+			_gameLayer,
+			arenaBounds,
+			GridSize
+		);
+
+		GD.Print("[Main] ✓ Enemies spawned for current room");
 	}
 
 	public override void _Process(double delta)
