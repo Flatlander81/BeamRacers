@@ -109,53 +109,31 @@ public abstract partial class GridCycle : CharacterBody2D
 	/// <summary>
 	/// Initializes trail renderer by removing old nodes and moving to world space
 	/// </summary>
-	protected void InitializeTrailRenderer(Node2D trailRenderer, Area2D trailCollision)
+	protected void InitializeTrailRenderer(Node2D trailRenderer)
 	{
-		// Remove old trail nodes
+		// Remove old trail nodes (if any)
 		var oldTrailLine = GetNodeOrNull<Line2D>("TrailRenderer/TrailLine");
 		if (oldTrailLine != null)
 		{
 			oldTrailLine.QueueFree();
 		}
 
-		var oldCollisionShape = GetNodeOrNull<CollisionPolygon2D>("TrailRenderer/TrailCollision/TrailCollisionShape");
-		if (oldCollisionShape != null)
-		{
-			oldCollisionShape.QueueFree();
-		}
-
-		// CRITICAL FIX: Disconnect old signal before reparenting
-		// The signal connection uses a relative path that breaks when we reparent
-		if (trailCollision.IsConnected("body_entered", new Callable(this, "_OnTrailCollisionBodyEntered")))
-		{
-			trailCollision.Disconnect("body_entered", new Callable(this, "_OnTrailCollisionBodyEntered"));
-			GD.Print($"[{GetType().Name}] Disconnected old trail collision signal");
-		}
-
-		// Move trail renderer to world space
+		// Move trail renderer to world space for proper rendering
 		RemoveChild(trailRenderer);
 		GetParent().AddChild(trailRenderer);
 		trailRenderer.GlobalPosition = Vector2.Zero;
 
-		// CRITICAL FIX: Reconnect signal after reparenting
-		// Now we can use a direct reference instead of a path
-		trailCollision.BodyEntered += _OnTrailCollisionBodyEntered;
-		GD.Print($"[{GetType().Name}] Reconnected trail collision signal after reparenting");
+		GD.Print($"[{GetType().Name}] Trail renderer moved to world space");
 	}
 
 	/// <summary>
-	/// Abstract method that child classes must implement for trail collision handling
+	/// Registers cycle with TrailManager using the specified color and trail type
 	/// </summary>
-	protected abstract void _OnTrailCollisionBodyEntered(Node2D body);
-
-	/// <summary>
-	/// Registers cycle with TrailManager using the specified color
-	/// </summary>
-	protected void RegisterWithTrailManager(Color trailColor, Node2D trailRenderer, Area2D trailCollision, string cycleTypeName)
+	protected void RegisterWithTrailManager(Color trailColor, Node2D trailRenderer, CellOccupant trailType, string cycleTypeName)
 	{
 		if (TrailManager.Instance != null)
 		{
-			TrailManager.Instance.RegisterCycle(this, trailColor, trailRenderer, trailCollision);
+			TrailManager.Instance.RegisterCycle(this, trailColor, trailRenderer, trailType);
 			GD.Print($"[{cycleTypeName}] ✓ Registered with TrailManager");
 		}
 		else

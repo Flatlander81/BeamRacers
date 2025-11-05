@@ -20,7 +20,6 @@ public partial class EnemyCycle : GridCycle
 	private Polygon2D _bodyPolygon;
 	private Line2D _outlineLine;
 	private Node2D _trailRenderer;
-	private Area2D _trailCollision;
 
 	// ========== GRID PARAMETERS ==========
 	public Rect2 ArenaBounds = new Rect2(-800, -450, 1600, 900);
@@ -48,10 +47,9 @@ public partial class EnemyCycle : GridCycle
 		_bodyPolygon = GetNode<Polygon2D>("Sprite/Body");
 		_outlineLine = GetNode<Line2D>("Sprite/Outline");
 		_trailRenderer = GetNode<Node2D>("TrailRenderer");
-		_trailCollision = GetNode<Area2D>("TrailRenderer/TrailCollision");
 
-		// Initialize trail renderer (now reconnects signal after reparenting)
-		InitializeTrailRenderer(_trailRenderer, _trailCollision);
+		// Initialize trail renderer
+		InitializeTrailRenderer(_trailRenderer);
 
 		// Generate visuals
 		GenerateWedgeGeometry();
@@ -60,13 +58,7 @@ public partial class EnemyCycle : GridCycle
 		InitializeDirection();
 
 		// Register with TrailManager
-		RegisterWithTrailManager(new Color(1, 0, 0, 0.8f), _trailRenderer, _trailCollision, "EnemyCycle");
-
-		// Debug: Verify collision configuration
-		GD.Print($"[EnemyCycle] CollisionLayer: {CollisionLayer}, CollisionMask: {CollisionMask}");
-		GD.Print($"[EnemyCycle] TrailCollision Layer: {_trailCollision.CollisionLayer}, Mask: {_trailCollision.CollisionMask}");
-		GD.Print($"[EnemyCycle] TrailCollision Monitoring: {_trailCollision.Monitoring}, Monitorable: {_trailCollision.Monitorable}");
-		GD.Print($"[EnemyCycle] TrailCollision Parent: {_trailCollision.GetParent().Name}");
+		RegisterWithTrailManager(new Color(1, 0, 0, 0.8f), _trailRenderer, CellOccupant.EnemyTrail, "EnemyCycle");
 
 		// Find player reference
 		_player = GetTree().Root.FindChild("Player", true, false) as Player;
@@ -123,6 +115,9 @@ public partial class EnemyCycle : GridCycle
 
 		// Move and slide
 		MoveAndSlide();
+
+		// Check collision with grid
+		CheckGridCollision();
 
 		// Check boundary
 		CheckBoundary();
@@ -264,6 +259,23 @@ public partial class EnemyCycle : GridCycle
 	}
 
 	/// <summary>
+	/// Checks grid collision (trails, boundaries, obstacles)
+	/// </summary>
+	private void CheckGridCollision()
+	{
+		if (GridCollisionManager.Instance == null) return;
+
+		CellOccupant occupant = GridCollisionManager.Instance.GetCell(GlobalPosition);
+
+		// Check if we hit anything that would kill us
+		if (occupant != CellOccupant.Empty)
+		{
+			GD.Print($"[EnemyCycle] Hit {occupant} at {GlobalPosition}");
+			Die();
+		}
+	}
+
+	/// <summary>
 	/// Checks if enemy has left the arena boundary and dies if so
 	/// </summary>
 	private void CheckBoundary()
@@ -272,44 +284,6 @@ public partial class EnemyCycle : GridCycle
 		{
 			GD.Print($"[EnemyCycle] Left arena boundary at {GlobalPosition}");
 			Die();
-		}
-	}
-
-	// ========== COLLISION HANDLING ==========
-	/// <summary>
-	/// Called when something collides with the trail
-	/// </summary>
-	protected override void _OnTrailCollisionBodyEntered(Node2D body)
-	{
-		GD.Print($"[EnemyCycle] Trail collision detected with: {body.Name} (Type: {body.GetType().Name})");
-
-		// Check if this enemy hit its own trail
-		if (body == this)
-		{
-			// Grace period: Ignore self-collision if we just turned at this position
-			if (TrailManager.Instance != null && TrailManager.Instance.IsWithinTurnGracePeriod(this, GlobalPosition))
-			{
-				GD.Print($"[EnemyCycle] Self-collision ignored (turn grace period)");
-				return;
-			}
-
-			GD.Print($"[EnemyCycle] Enemy hit own trail at {GlobalPosition}");
-			Die();
-		}
-		// Check if the player hit this enemy's trail
-		else if (body is Player player)
-		{
-			GD.Print($"[EnemyCycle] Player hit enemy trail at {body.GlobalPosition}");
-			if (!player.IsShieldActive())
-			{
-				player.Die();
-			}
-		}
-		// Check if another enemy hit this enemy's trail
-		else if (body is EnemyCycle otherEnemy)
-		{
-			GD.Print($"[EnemyCycle] Enemy hit another enemy's trail at {body.GlobalPosition}");
-			otherEnemy.Die();
 		}
 	}
 

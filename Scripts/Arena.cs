@@ -77,7 +77,6 @@ public partial class Arena : Node2D
 	private const float BOUNDARY_WIDTH = 2.0f;
 	private static readonly Color GRID_COLOR = new Color(0, 0.3f, 0.5f, 0.15f);  // Subtle blue
 	private const float GRID_SPACING = 50.0f;
-	private const int COLLISION_LAYER = 3;
 
 	public override void _Ready()
 	{
@@ -180,60 +179,49 @@ public partial class Arena : Node2D
 
 		float halfWidth = arenaSize.X / 2;
 		float halfHeight = arenaSize.Y / 2;
-		float wallThickness = 10.0f;
 
-		// Define wall configurations (name, position, width, height, isHorizontal)
-		var wallConfigs = new[]
+		// Define wall endpoints for Line2D visual and grid collision
+		var wallLines = new[]
 		{
-			("TopWall", new Vector2(0, -halfHeight), arenaSize.X, wallThickness, true),
-			("BottomWall", new Vector2(0, halfHeight), arenaSize.X, wallThickness, true),
-			("LeftWall", new Vector2(-halfWidth, 0), wallThickness, arenaSize.Y, false),
-			("RightWall", new Vector2(halfWidth, 0), wallThickness, arenaSize.Y, false)
+			("TopWall", new Vector2(-halfWidth, -halfHeight), new Vector2(halfWidth, -halfHeight)),
+			("BottomWall", new Vector2(-halfWidth, halfHeight), new Vector2(halfWidth, halfHeight)),
+			("LeftWall", new Vector2(-halfWidth, -halfHeight), new Vector2(-halfWidth, halfHeight)),
+			("RightWall", new Vector2(halfWidth, -halfHeight), new Vector2(halfWidth, halfHeight))
 		};
 
-		// Create all walls using loop
-		foreach (var (name, position, width, height, isHorizontal) in wallConfigs)
+		// Create visual boundaries and register with grid collision
+		foreach (var (name, start, end) in wallLines)
 		{
-			var wall = CreateBoundaryWall(position, width, height, isHorizontal);
-			wall.Name = name;
-			_boundaries.AddChild(wall);
+			CreateBoundaryWall(name, start, end);
 		}
 
-		GD.Print($"[Arena] ✓ Generated boundaries ({arenaSize.X}x{arenaSize.Y}) with collision");
+		GD.Print($"[Arena] ✓ Generated boundaries ({arenaSize.X}x{arenaSize.Y}) with grid collision");
 	}
 
 	/// <summary>
-	/// Creates a single boundary wall with collision
+	/// Creates a single boundary wall (visual + grid collision)
 	/// </summary>
-	private StaticBody2D CreateBoundaryWall(Vector2 position, float width, float height, bool horizontal)
+	private void CreateBoundaryWall(string name, Vector2 start, Vector2 end)
 	{
-		var wall = new StaticBody2D();
-		wall.Position = position;
-		wall.CollisionLayer = COLLISION_LAYER;
-		wall.CollisionMask = 0;
+		// Create visual container
+		var wall = new Node2D();
+		wall.Name = name;
 
-		// Create collision shape
-		var collisionShape = new CollisionShape2D();
-		var rectShape = new RectangleShape2D();
-		rectShape.Size = new Vector2(width, height);
-		collisionShape.Shape = rectShape;
-		wall.AddChild(collisionShape);
+		// Create visual Line2D
+		var line = new Line2D();
+		line.AddPoint(start);
+		line.AddPoint(end);
+		line.DefaultColor = BOUNDARY_COLOR;
+		line.Width = BOUNDARY_WIDTH;
+		wall.AddChild(line);
 
-		// Create visual outline
-		var outline = new Line2D();
-		float halfWidth = width / 2;
-		float halfHeight = height / 2;
+		_boundaries.AddChild(wall);
 
-		outline.AddPoint(new Vector2(-halfWidth, -halfHeight));
-		outline.AddPoint(new Vector2(halfWidth, -halfHeight));
-		outline.AddPoint(new Vector2(halfWidth, halfHeight));
-		outline.AddPoint(new Vector2(-halfWidth, halfHeight));
-		outline.AddPoint(new Vector2(-halfWidth, -halfHeight)); // Close the loop
-		outline.DefaultColor = BOUNDARY_COLOR;
-		outline.Width = BOUNDARY_WIDTH;
-		wall.AddChild(outline);
-
-		return wall;
+		// Register with grid collision system
+		if (GridCollisionManager.Instance != null)
+		{
+			GridCollisionManager.Instance.SetLine(start, end, CellOccupant.Boundary);
+		}
 	}
 
 	/// <summary>
@@ -252,21 +240,13 @@ public partial class Arena : Node2D
 	}
 
 	/// <summary>
-	/// Spawn a pillar obstacle
+	/// Spawn a pillar obstacle (visual + grid collision)
 	/// </summary>
 	private void SpawnPillar(Vector2 position, float radius)
 	{
-		var pillar = new StaticBody2D();
+		// Create visual container
+		var pillar = new Node2D();
 		pillar.Position = position;
-		pillar.CollisionLayer = COLLISION_LAYER;
-		pillar.CollisionMask = 0;
-
-		// Create collision shape
-		var collisionShape = new CollisionShape2D();
-		var circleShape = new CircleShape2D();
-		circleShape.Radius = radius;
-		collisionShape.Shape = circleShape;
-		pillar.AddChild(collisionShape);
 
 		// Create visual polygon (filled circle)
 		var polygon = new Polygon2D();
@@ -295,27 +275,25 @@ public partial class Arena : Node2D
 		pillar.AddChild(outline);
 
 		_obstacles.AddChild(pillar);
+
+		// Register with grid collision system
+		if (GridCollisionManager.Instance != null)
+		{
+			GridCollisionManager.Instance.SetCircle(position, radius, CellOccupant.Obstacle);
+		}
 	}
 
 	/// <summary>
-	/// Spawn a wall obstacle
+	/// Spawn a wall obstacle (visual + grid collision)
 	/// </summary>
 	private void SpawnWall(Vector2 position, float length, float rotation)
 	{
-		var wall = new StaticBody2D();
+		// Create visual container
+		var wall = new Node2D();
 		wall.Position = position;
 		wall.Rotation = rotation;
-		wall.CollisionLayer = COLLISION_LAYER;
-		wall.CollisionMask = 0;
 
-		// Create collision shape (rectangular)
-		var collisionShape = new CollisionShape2D();
-		var rectShape = new RectangleShape2D();
-		rectShape.Size = new Vector2(length, 10);  // 10 units thick
-		collisionShape.Shape = rectShape;
-		wall.AddChild(collisionShape);
-
-		// Create visual outline (just the rectangle outline)
+		// Create visual outline
 		var outline = new Line2D();
 		float halfLength = length / 2;
 		outline.AddPoint(new Vector2(-halfLength, -5));
@@ -328,6 +306,17 @@ public partial class Arena : Node2D
 		wall.AddChild(outline);
 
 		_obstacles.AddChild(wall);
+
+		// Calculate rotated wall endpoints for grid collision
+		Vector2 direction = new Vector2(Mathf.Cos(rotation), Mathf.Sin(rotation));
+		Vector2 start = position - direction * halfLength;
+		Vector2 end = position + direction * halfLength;
+
+		// Register with grid collision system
+		if (GridCollisionManager.Instance != null)
+		{
+			GridCollisionManager.Instance.SetLine(start, end, CellOccupant.Obstacle);
+		}
 	}
 
 	/// <summary>

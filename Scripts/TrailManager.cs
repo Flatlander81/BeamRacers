@@ -1,5 +1,4 @@
 using Godot;
-using System;
 using System.Collections.Generic;
 
 /// <summary>
@@ -18,8 +17,8 @@ public struct TrailWall
 }
 
 /// <summary>
-/// Centralized manager for all trail walls in the game.
-/// Handles trail rendering, collision, and cleanup.
+/// Centralized manager for trail rendering and grid-based collision.
+/// Uses GridCollisionManager for instant, deterministic collision detection.
 /// </summary>
 public partial class TrailManager : Node2D
 {
@@ -31,9 +30,7 @@ public partial class TrailManager : Node2D
 	private Dictionary<Node2D, CycleTrailData> _cycleTrails = new Dictionary<Node2D, CycleTrailData>();
 
 	// ========== CONSTANTS ==========
-	private const float TRAIL_VISUAL_WIDTH = 4.0f; // Visual trail line thickness
-	private const float TRAIL_COLLISION_WIDTH = 12.0f; // Must be >= cycle collision radius (10.0) to ensure hits
-	private const float COLLISION_UPDATE_INTERVAL = 0.1667f; // Update collision ~6 times/sec (every 10 frames at 60fps)
+	private const float TRAIL_VISUAL_WIDTH = 4.0f;
 
 	// ========== INITIALIZATION ==========
 	public override void _EnterTree()
@@ -46,7 +43,6 @@ public partial class TrailManager : Node2D
 		}
 
 		_instance = this;
-		GD.Print("[TrailManager] ✓ Singleton instance created");
 	}
 
 	public override void _Ready()
@@ -59,7 +55,7 @@ public partial class TrailManager : Node2D
 	/// <summary>
 	/// Registers a cycle (player or enemy) with the trail system
 	/// </summary>
-	public void RegisterCycle(Node2D cycle, Color trailColor, Node2D trailRenderer, Area2D trailCollision)
+	public void RegisterCycle(Node2D cycle, Color trailColor, Node2D trailRenderer, CellOccupant trailType)
 	{
 		if (_cycleTrails.ContainsKey(cycle))
 		{
@@ -72,19 +68,14 @@ public partial class TrailManager : Node2D
 			Owner = cycle,
 			TrailColor = trailColor,
 			TrailRenderer = trailRenderer,
-			TrailCollision = trailCollision,
+			TrailType = trailType,
 			Walls = new List<TrailWall>(),
 			CurrentWallStart = cycle.GlobalPosition,
-			HasWallStart = true,
-			LastWallIndex = -1,
-			LastTurnPosition = Vector2.Zero,
-			LastTurnTime = 0f,
-			TimeSinceCollisionUpdate = 0f
+			HasWallStart = true
 		};
 
 		_cycleTrails[cycle] = trailData;
 		GD.Print($"[TrailManager] Registered cycle: {cycle.Name} (Type: {cycle.GetType().Name})");
-		GD.Print($"[TrailManager]   - TrailCollision instance ID: {trailCollision.GetInstanceId()}");
 	}
 
 	/// <summary>
@@ -115,66 +106,45 @@ public partial class TrailManager : Node2D
 		{
 			var wall = new TrailWall(trailData.CurrentWallStart, turnPosition);
 			trailData.Walls.Add(wall);
-			trailData.LastWallIndex = trailData.Walls.Count - 1;
+
+			// Register wall in grid collision system
+			if (GridCollisionManager.Instance != null)
+			{
+				GridCollisionManager.Instance.SetLine(wall.Start, wall.End, trailData.TrailType);
+			}
 		}
 
 		// Start new wall at turn point
 		trailData.CurrentWallStart = turnPosition;
 		trailData.HasWallStart = true;
 
-		// Track turn position and time for grace period
-		trailData.LastTurnPosition = turnPosition;
-		trailData.LastTurnTime = Time.GetTicksMsec() / 1000f;
-
-		// Update visuals and collision
+		// Update visuals
 		UpdateTrailVisual(trailData);
-		UpdateTrailCollision(trailData);
 	}
 
 	/// <summary>
-	/// Updates trail visual and collision for a cycle (called every frame)
+	/// Updates trail visual for a cycle (called every frame)
 	/// </summary>
 	public void UpdateCycleTrail(Node2D cycle, float delta)
 	{
 		if (!_cycleTrails.TryGetValue(cycle, out var trailData))
 			return;
 
-		// Always update visual (cheap operation)
+		// Update visual (includes current wall being drawn)
 		UpdateTrailVisual(trailData);
 
-		// Throttle collision updates to reduce performance cost
-		trailData.TimeSinceCollisionUpdate += delta;
-		if (trailData.TimeSinceCollisionUpdate >= COLLISION_UPDATE_INTERVAL)
+		// Update grid collision for current wall segment
+		// This ensures the actively-being-drawn trail is also collidable
+		if (GridCollisionManager.Instance != null && trailData.HasWallStart &&
+		    trailData.Owner != null && IsInstanceValid(trailData.Owner))
 		{
-			UpdateTrailCollision(trailData);
-			trailData.TimeSinceCollisionUpdate = 0f;
+			Vector2 currentPos = trailData.Owner.GlobalPosition;
+			if (currentPos.DistanceTo(trailData.CurrentWallStart) > 1.0f)
+			{
+				// Mark the current trail segment in the grid
+				GridCollisionManager.Instance.SetLine(trailData.CurrentWallStart, currentPos, trailData.TrailType);
+			}
 		}
-	}
-
-	/// <summary>
-	/// Checks if a cycle is within the grace period after turning (to prevent immediate self-collision)
-	/// </summary>
-	public bool IsWithinTurnGracePeriod(Node2D cycle, Vector2 collisionPosition)
-	{
-		if (!_cycleTrails.TryGetValue(cycle, out var trailData))
-			return false;
-
-		// Grace period: 0.1 seconds and within 15 units of the last turn position
-		float timeSinceTurn = Time.GetTicksMsec() / 1000f - trailData.LastTurnTime;
-		float distanceFromTurn = collisionPosition.DistanceTo(trailData.LastTurnPosition);
-
-		if (timeSinceTurn < 0.1f && distanceFromTurn < 15f)
-			return true;
-
-		// Also ignore collision very close to current position (trailing edge of current wall)
-		if (trailData.Owner != null && IsInstanceValid(trailData.Owner))
-		{
-			float distanceFromCurrent = collisionPosition.DistanceTo(trailData.Owner.GlobalPosition);
-			if (distanceFromCurrent < 15f)
-				return true;
-		}
-
-		return false;
 	}
 
 	/// <summary>
@@ -190,7 +160,6 @@ public partial class TrailManager : Node2D
 		// Reset state
 		trailData.Walls.Clear();
 		trailData.CurrentWallStart = cycle.GlobalPosition;
-		trailData.LastWallIndex = -1;
 	}
 
 	/// <summary>
@@ -206,10 +175,6 @@ public partial class TrailManager : Node2D
 
 		for (int i = 0; i < trailData.Walls.Count; i++)
 		{
-			// Skip the last wall (no collision yet)
-			if (i == trailData.LastWallIndex)
-				continue;
-
 			Vector2 closestPoint = ClosestPointOnLineSegment(position, trailData.Walls[i].Start, trailData.Walls[i].End);
 			float distance = position.DistanceTo(closestPoint);
 
@@ -222,51 +187,26 @@ public partial class TrailManager : Node2D
 
 		if (hitWallIndex == -1 || closestDistance > 20.0f)
 		{
-			GD.Print($"[TrailManager] No wall found near position {position}");
 			return;
 		}
 
-		// Remove the wall
-		trailData.Walls.RemoveAt(hitWallIndex);
+		// Remove the wall from grid
+		if (GridCollisionManager.Instance != null)
+		{
+			GridCollisionManager.Instance.SetLine(
+				trailData.Walls[hitWallIndex].Start,
+				trailData.Walls[hitWallIndex].End,
+				CellOccupant.Empty
+			);
+		}
 
-		// Update last wall index
-		if (trailData.LastWallIndex > hitWallIndex)
-			trailData.LastWallIndex--;
-		else if (trailData.LastWallIndex == hitWallIndex)
-			trailData.LastWallIndex = -1;
+		// Remove from walls list
+		trailData.Walls.RemoveAt(hitWallIndex);
 
 		GD.Print($"[TrailManager] Wall destroyed at index {hitWallIndex}");
 
-		// Update visuals and collision
+		// Update visuals
 		UpdateTrailVisual(trailData);
-		UpdateTrailCollision(trailData);
-	}
-
-	/// <summary>
-	/// Checks if a position collides with any trail wall
-	/// </summary>
-	public bool CheckCollisionWithTrails(Vector2 position, Node2D ignoreCycle = null)
-	{
-		foreach (var kvp in _cycleTrails)
-		{
-			// Skip checking against own trails if specified
-			if (ignoreCycle != null && kvp.Key == ignoreCycle)
-				continue;
-
-			var trailData = kvp.Value;
-			for (int i = 0; i < trailData.Walls.Count; i++)
-			{
-				// Skip the last wall
-				if (i == trailData.LastWallIndex)
-					continue;
-
-				Vector2 closestPoint = ClosestPointOnLineSegment(position, trailData.Walls[i].Start, trailData.Walls[i].End);
-				if (position.DistanceTo(closestPoint) < TRAIL_COLLISION_WIDTH)
-					return true;
-			}
-		}
-
-		return false;
 	}
 
 	// ========== PRIVATE METHODS ==========
@@ -277,7 +217,13 @@ public partial class TrailManager : Node2D
 			return;
 
 		// Clear existing trail lines
-		ClearChildrenOfType<Line2D>(trailData.TrailRenderer, removeBeforeFreeing: true);
+		foreach (Node child in trailData.TrailRenderer.GetChildren())
+		{
+			if (child is Line2D)
+			{
+				child.QueueFree();
+			}
+		}
 
 		// Render all completed walls
 		foreach (var wall in trailData.Walls)
@@ -293,34 +239,6 @@ public partial class TrailManager : Node2D
 			{
 				var currentWall = new TrailWall(trailData.CurrentWallStart, currentPos);
 				CreateWallLine(currentWall, trailData.TrailColor, trailData.TrailRenderer);
-			}
-		}
-	}
-
-	private void UpdateTrailCollision(CycleTrailData trailData)
-	{
-		if (trailData.TrailCollision == null || !IsInstanceValid(trailData.TrailCollision))
-			return;
-
-		// Clear existing collision shapes
-		ClearChildrenOfType<CollisionPolygon2D>(trailData.TrailCollision, removeBeforeFreeing: true);
-
-		// FIXED: Create collision shape for ALL walls - no exceptions!
-		// Any cycle body hitting any trail wall should cause a collision
-		for (int i = 0; i < trailData.Walls.Count; i++)
-		{
-			CreateCollisionForWall(trailData.Walls[i], trailData.TrailCollision);
-		}
-
-		// CRITICAL: Create collision for the current wall being laid
-		// This ensures cycles can't drive along the actively-being-drawn trail
-		if (trailData.HasWallStart && trailData.Owner != null && IsInstanceValid(trailData.Owner))
-		{
-			Vector2 currentPos = trailData.Owner.GlobalPosition;
-			if (currentPos.DistanceTo(trailData.CurrentWallStart) > 1.0f)
-			{
-				var currentWall = new TrailWall(trailData.CurrentWallStart, currentPos);
-				CreateCollisionForWall(currentWall, trailData.TrailCollision);
 			}
 		}
 	}
@@ -342,65 +260,28 @@ public partial class TrailManager : Node2D
 		container.AddChild(line);
 	}
 
-	private void CreateCollisionForWall(TrailWall wall, Area2D collisionArea)
-	{
-		Vector2 direction = (wall.End - wall.Start).Normalized();
-		Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * (TRAIL_COLLISION_WIDTH / 2.0f);
-
-		Vector2[] collisionPoints = new Vector2[]
-		{
-			wall.Start + perpendicular,
-			wall.End + perpendicular,
-			wall.End - perpendicular,
-			wall.Start - perpendicular
-		};
-
-		var collisionShape = new CollisionPolygon2D();
-		collisionShape.Polygon = collisionPoints;
-		collisionArea.AddChild(collisionShape);
-	}
-
-	/// <summary>
-	/// Generic helper to clear all children of a specific type from a parent node
-	/// </summary>
-	private void ClearChildrenOfType<T>(Node parent, bool removeBeforeFreeing = false) where T : Node
-	{
-		if (parent == null || !IsInstanceValid(parent))
-			return;
-
-		if (removeBeforeFreeing)
-		{
-			// Two-step process: collect, then remove and free
-			var childrenToRemove = new List<Node>();
-			foreach (Node child in parent.GetChildren())
-			{
-				if (child is T)
-					childrenToRemove.Add(child);
-			}
-			foreach (Node child in childrenToRemove)
-			{
-				parent.RemoveChild(child);
-				child.QueueFree();
-			}
-		}
-		else
-		{
-			// Direct queue free
-			foreach (Node child in parent.GetChildren())
-			{
-				if (child is T)
-					child.QueueFree();
-			}
-		}
-	}
-
 	private void ClearCycleTrails(CycleTrailData trailData)
 	{
-		// Clear trail visuals
-		ClearChildrenOfType<Line2D>(trailData.TrailRenderer);
+		// Clear from grid collision system
+		if (GridCollisionManager.Instance != null)
+		{
+			foreach (var wall in trailData.Walls)
+			{
+				GridCollisionManager.Instance.SetLine(wall.Start, wall.End, CellOccupant.Empty);
+			}
+		}
 
-		// Clear collision shapes
-		ClearChildrenOfType<CollisionPolygon2D>(trailData.TrailCollision);
+		// Clear trail visuals
+		if (trailData.TrailRenderer != null && IsInstanceValid(trailData.TrailRenderer))
+		{
+			foreach (Node child in trailData.TrailRenderer.GetChildren())
+			{
+				if (child is Line2D)
+				{
+					child.QueueFree();
+				}
+			}
+		}
 	}
 
 	private Vector2 ClosestPointOnLineSegment(Vector2 point, Vector2 lineStart, Vector2 lineEnd)
@@ -427,13 +308,9 @@ public partial class TrailManager : Node2D
 		public Node2D Owner;
 		public Color TrailColor;
 		public Node2D TrailRenderer;
-		public Area2D TrailCollision;
+		public CellOccupant TrailType;
 		public List<TrailWall> Walls;
 		public Vector2 CurrentWallStart;
 		public bool HasWallStart;
-		public int LastWallIndex;
-		public Vector2 LastTurnPosition;
-		public float LastTurnTime;
-		public float TimeSinceCollisionUpdate;
 	}
 }

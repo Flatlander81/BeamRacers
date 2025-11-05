@@ -18,7 +18,6 @@ public partial class Player : GridCycle
 	private Line2D _outlineLine;
 	private Polygon2D _shieldVisual;
 	private Node2D _trailRenderer;
-	private Area2D _trailCollision;
 
 	// ========== MOVEMENT STATE ==========
 	public int GridExtent = 2000;
@@ -47,10 +46,9 @@ public partial class Player : GridCycle
 		_outlineLine = GetNode<Line2D>("Sprite/Outline");
 		_shieldVisual = GetNode<Polygon2D>("ShieldSystem/ShieldVisual");
 		_trailRenderer = GetNode<Node2D>("TrailRenderer");
-		_trailCollision = GetNode<Area2D>("TrailRenderer/TrailCollision");
 
-		// Initialize trail renderer (now reconnects signal after reparenting)
-		InitializeTrailRenderer(_trailRenderer, _trailCollision);
+		// Initialize trail renderer
+		InitializeTrailRenderer(_trailRenderer);
 		GD.Print("[Player] ✓ Trail renderer moved to world space");
 
 		// Generate visuals
@@ -58,13 +56,8 @@ public partial class Player : GridCycle
 		GenerateShieldGeometry();
 
 		// Register with TrailManager
-		RegisterWithTrailManager(new Color(0, 1, 1, 0.8f), _trailRenderer, _trailCollision, "Player");
+		RegisterWithTrailManager(new Color(0, 1, 1, 0.8f), _trailRenderer, CellOccupant.PlayerTrail, "Player");
 
-		// Debug: Verify collision configuration
-		GD.Print($"[Player] CollisionLayer: {CollisionLayer}, CollisionMask: {CollisionMask}");
-		GD.Print($"[Player] TrailCollision Layer: {_trailCollision.CollisionLayer}, Mask: {_trailCollision.CollisionMask}");
-		GD.Print($"[Player] TrailCollision Monitoring: {_trailCollision.Monitoring}, Monitorable: {_trailCollision.Monitorable}");
-		GD.Print($"[Player] TrailCollision Parent: {_trailCollision.GetParent().Name}");
 		GD.Print($"[Player] ✓ Player initialized at {GlobalPosition}");
 	}
 
@@ -125,6 +118,9 @@ public partial class Player : GridCycle
 		// Move and slide
 		MoveAndSlide();
 
+		// Check collision with grid
+		CheckGridCollision();
+
 		// Check boundary
 		CheckBoundary();
 
@@ -140,6 +136,36 @@ public partial class Player : GridCycle
 		{
 			PrintDebugInfo();
 			_frameCounter = 0;
+		}
+	}
+
+	/// <summary>
+	/// Checks grid collision (trails, boundaries, obstacles)
+	/// </summary>
+	private void CheckGridCollision()
+	{
+		if (!_inputEnabled || GridCollisionManager.Instance == null) return;
+
+		CellOccupant occupant = GridCollisionManager.Instance.GetCell(GlobalPosition);
+
+		// Check if we hit anything
+		if (occupant != CellOccupant.Empty)
+		{
+			// Handle shield absorption
+			if (occupant == CellOccupant.PlayerTrail && _shieldState == ShieldState.Active)
+			{
+				if (!_shieldBrokeTrailThisActivation)
+				{
+					TrailManager.Instance?.BreakClosestWall(GlobalPosition, this);
+					_shieldBrokeTrailThisActivation = true;
+					GD.Print("[Player] Shield absorbed trail collision!");
+				}
+				return;
+			}
+
+			// Otherwise, player dies
+			GD.Print($"[Player] Hit {occupant} at {GlobalPosition}");
+			Die();
 		}
 	}
 
@@ -259,47 +285,6 @@ public partial class Player : GridCycle
 		_shieldVisual.Visible = false;
 
 		GD.Print($"[Player] Shield deactivated. Cooldown: {ShieldCooldown}s");
-	}
-
-	// ========== COLLISION HANDLING ==========
-	/// <summary>
-	/// Called when something collides with the trail
-	/// </summary>
-	protected override void _OnTrailCollisionBodyEntered(Node2D body)
-	{
-		GD.Print($"[Player] Trail collision detected with: {body.Name} (Type: {body.GetType().Name})");
-
-		// Check if it's the player hitting their own trail
-		if (body == this)
-		{
-			// Grace period: Ignore self-collision if we just turned at this position
-			if (TrailManager.Instance != null && TrailManager.Instance.IsWithinTurnGracePeriod(this, GlobalPosition))
-			{
-				GD.Print($"[Player] Self-collision ignored (turn grace period)");
-				return;
-			}
-
-			if (_shieldState == ShieldState.Active)
-			{
-				if (!_shieldBrokeTrailThisActivation)
-				{
-					GD.Print($"[Player] Shield collision detected at {GlobalPosition}");
-					TrailManager.Instance?.BreakClosestWall(GlobalPosition, this);
-					_shieldBrokeTrailThisActivation = true;
-					GD.Print("[Player] Shield absorbed trail collision!");
-				}
-			}
-			else
-			{
-				Die();
-			}
-		}
-		// Check if an enemy hit the player's trail
-		else if (body is EnemyCycle enemy)
-		{
-			GD.Print($"[Player] Enemy hit player trail at {body.GlobalPosition}");
-			enemy.Die();
-		}
 	}
 
 	// ========== DEATH HANDLING ==========
