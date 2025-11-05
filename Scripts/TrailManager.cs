@@ -33,6 +33,7 @@ public partial class TrailManager : Node2D
 	// ========== CONSTANTS ==========
 	private const float TRAIL_VISUAL_WIDTH = 4.0f; // Visual trail line thickness
 	private const float TRAIL_COLLISION_WIDTH = 12.0f; // Must be >= cycle collision radius (10.0) to ensure hits
+	private const float COLLISION_UPDATE_INTERVAL = 0.1667f; // Update collision ~6 times/sec (every 10 frames at 60fps)
 
 	// ========== INITIALIZATION ==========
 	public override void _EnterTree()
@@ -77,7 +78,8 @@ public partial class TrailManager : Node2D
 			HasWallStart = true,
 			LastWallIndex = -1,
 			LastTurnPosition = Vector2.Zero,
-			LastTurnTime = 0f
+			LastTurnTime = 0f,
+			TimeSinceCollisionUpdate = 0f
 		};
 
 		_cycleTrails[cycle] = trailData;
@@ -132,13 +134,21 @@ public partial class TrailManager : Node2D
 	/// <summary>
 	/// Updates trail visual and collision for a cycle (called every frame)
 	/// </summary>
-	public void UpdateCycleTrail(Node2D cycle)
+	public void UpdateCycleTrail(Node2D cycle, float delta)
 	{
 		if (!_cycleTrails.TryGetValue(cycle, out var trailData))
 			return;
 
+		// Always update visual (cheap operation)
 		UpdateTrailVisual(trailData);
-		UpdateTrailCollision(trailData);
+
+		// Throttle collision updates to reduce performance cost
+		trailData.TimeSinceCollisionUpdate += delta;
+		if (trailData.TimeSinceCollisionUpdate >= COLLISION_UPDATE_INTERVAL)
+		{
+			UpdateTrailCollision(trailData);
+			trailData.TimeSinceCollisionUpdate = 0f;
+		}
 	}
 
 	/// <summary>
@@ -424,5 +434,6 @@ public partial class TrailManager : Node2D
 		public int LastWallIndex;
 		public Vector2 LastTurnPosition;
 		public float LastTurnTime;
+		public float TimeSinceCollisionUpdate;
 	}
 }

@@ -128,7 +128,7 @@ public partial class EnemyCycle : GridCycle
 		CheckBoundary();
 
 		// Update trail via TrailManager
-		TrailManager.Instance?.UpdateCycleTrail(this);
+		TrailManager.Instance?.UpdateCycleTrail(this, deltaF);
 	}
 
 	/// <summary>

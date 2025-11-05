@@ -129,7 +129,7 @@ public partial class Player : GridCycle
 		CheckBoundary();
 
 		// Update trail via TrailManager
-		TrailManager.Instance?.UpdateCycleTrail(this);
+		TrailManager.Instance?.UpdateCycleTrail(this, deltaF);
 
 		// Handle shield
 		UpdateShield(deltaF);
