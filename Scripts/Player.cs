@@ -41,6 +41,7 @@ public partial class Player : GridCycle
 	private float _autoTestTimer = 0.0f;
 	private int _autoTestStep = 0;
 	private string _autoTestPattern = "rapid_double_turn";
+	private bool _collisionTestMode = false;  // When true, log collisions but don't die
 
 	// ========== INITIALIZATION ==========
 	public override void _Ready()
@@ -154,9 +155,8 @@ public partial class Player : GridCycle
 
 		// Check the cell ahead of us in our movement direction, not our current cell
 		// This prevents hitting our own currently-drawing trail while allowing others to hit it
-		// We check 1.5 * GridSize ahead to GUARANTEE we're checking the next grid cell
 		Vector2 directionVector = GetDirectionVector();
-		Vector2 checkPosition = GlobalPosition + directionVector * (GridSize * 1.5f);
+		Vector2 checkPosition = GlobalPosition + directionVector * (GridSize / 2.0f);
 
 		// Debug logging
 		Vector2I currentGrid = GridCollisionManager.Instance.WorldToGrid(GlobalPosition);
@@ -183,9 +183,16 @@ public partial class Player : GridCycle
 				return;
 			}
 
-			// Otherwise, player dies
-			GD.Print($"[Player] ☠ DEATH: Hit {occupant} at {checkPosition} (grid {checkGrid})");
-			Die();
+			// Otherwise, player dies (or just logs in test mode)
+			if (_collisionTestMode)
+			{
+				GD.Print($"[Player] 🧪 TEST MODE COLLISION: Would have died hitting {occupant} at {checkPosition} (grid {checkGrid})");
+			}
+			else
+			{
+				GD.Print($"[Player] ☠ DEATH: Hit {occupant} at {checkPosition} (grid {checkGrid})");
+				Die();
+			}
 		}
 	}
 
@@ -198,8 +205,15 @@ public partial class Player : GridCycle
 
 		if (Mathf.Abs(GlobalPosition.X) > GridExtent || Mathf.Abs(GlobalPosition.Y) > GridExtent)
 		{
-			GD.Print($"[Player] Left grid boundary at {GlobalPosition}");
-			Die();
+			if (_collisionTestMode)
+			{
+				GD.Print($"[Player] 🧪 TEST MODE: Would have died leaving grid boundary at {GlobalPosition}");
+			}
+			else
+			{
+				GD.Print($"[Player] Left grid boundary at {GlobalPosition}");
+				Die();
+			}
 		}
 	}
 

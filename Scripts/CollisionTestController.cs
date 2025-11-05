@@ -259,6 +259,13 @@ public partial class CollisionTestController : Node
 		_currentTestScenario = 0;
 		_testTimer = 0.0f;
 
+		// Enable collision test mode on player (logs collisions without dying)
+		if (_player != null)
+		{
+			_player.Set("_collisionTestMode", true);
+			GD.Print("[CollisionTest] Player collision test mode enabled");
+		}
+
 		GD.Print("\n╔═══════════════════════════════════════════════════════╗");
 		GD.Print("║  COLLISION TEST SUITE - AUTOMATED TESTING INITIATED   ║");
 		GD.Print("╚═══════════════════════════════════════════════════════╝");
@@ -358,6 +365,14 @@ public partial class CollisionTestController : Node
 	{
 		_testActive = false;
 
+		// Disable collision test mode and auto test mode on player
+		if (_player != null)
+		{
+			_player.Set("_collisionTestMode", false);
+			_player.Set("_autoTestMode", false);
+			GD.Print("[CollisionTest] Player test modes disabled");
+		}
+
 		GD.Print("\n╔═══════════════════════════════════════════════════════╗");
 		GD.Print("║     COLLISION TEST SUITE COMPLETE                     ║");
 		GD.Print("╚═══════════════════════════════════════════════════════╝");
@@ -410,6 +425,7 @@ public partial class CollisionTestController : Node
 		enemy.Rotation = direction * Mathf.Pi / 2.0f;
 		enemy.Set("_autoTestMode", true);
 		enemy.Set("_autoTestPattern", pattern);
+		enemy.Set("_collisionTestMode", true);  // Log collisions without dying
 
 		_gameLayer.AddChild(enemy);
 		_testEnemies.Add(enemy);

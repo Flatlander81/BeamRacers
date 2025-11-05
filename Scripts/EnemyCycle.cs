@@ -43,6 +43,7 @@ public partial class EnemyCycle : GridCycle
 	private float _autoTestTimer = 0.0f;
 	private int _autoTestStep = 0;
 	private string _autoTestPattern = "move_straight";
+	private bool _collisionTestMode = false;  // When true, log collisions but don't die
 
 	// ========== INITIALIZATION ==========
 	public override void _Ready()
@@ -333,9 +334,8 @@ public partial class EnemyCycle : GridCycle
 
 		// Check the cell ahead of us in our movement direction, not our current cell
 		// This prevents hitting our own currently-drawing trail while allowing others to hit it
-		// We check 1.5 * GridSize ahead to GUARANTEE we're checking the next grid cell
 		Vector2 directionVector = GetDirectionVector();
-		Vector2 checkPosition = GlobalPosition + directionVector * (GridSize * 1.5f);
+		Vector2 checkPosition = GlobalPosition + directionVector * (GridSize / 2.0f);
 
 		// Debug logging
 		Vector2I currentGrid = GridCollisionManager.Instance.WorldToGrid(GlobalPosition);
@@ -348,8 +348,16 @@ public partial class EnemyCycle : GridCycle
 		if (occupant != CellOccupant.Empty)
 		{
 			GD.Print($"[Enemy] ⚠ COLLISION DETECTED: {occupant} at {checkPosition} (grid {checkGrid})");
-			GD.Print($"[Enemy] ☠ DEATH: Hit {occupant} at {checkPosition}");
-			Die();
+
+			if (_collisionTestMode)
+			{
+				GD.Print($"[Enemy] 🧪 TEST MODE COLLISION: Would have died hitting {occupant} at {checkPosition}");
+			}
+			else
+			{
+				GD.Print($"[Enemy] ☠ DEATH: Hit {occupant} at {checkPosition}");
+				Die();
+			}
 		}
 	}
 
@@ -360,8 +368,15 @@ public partial class EnemyCycle : GridCycle
 	{
 		if (!ArenaBounds.HasPoint(GlobalPosition))
 		{
-			GD.Print($"[EnemyCycle] Left arena boundary at {GlobalPosition}");
-			Die();
+			if (_collisionTestMode)
+			{
+				GD.Print($"[EnemyCycle] 🧪 TEST MODE: Would have died leaving arena boundary at {GlobalPosition}");
+			}
+			else
+			{
+				GD.Print($"[EnemyCycle] Left arena boundary at {GlobalPosition}");
+				Die();
+			}
 		}
 	}
 
