@@ -31,7 +31,7 @@ public partial class TrailManager : Node2D
 	private Dictionary<Node2D, CycleTrailData> _cycleTrails = new Dictionary<Node2D, CycleTrailData>();
 
 	// ========== CONSTANTS ==========
-	private const float TRAIL_WIDTH = 4.0f;
+	private const float TRAIL_WIDTH = 12.0f; // Must be >= cycle collision radius (10.0) to ensure hits
 
 	// ========== INITIALIZATION ==========
 	public override void _EnterTree()
