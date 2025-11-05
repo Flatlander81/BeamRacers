@@ -28,7 +28,7 @@ public partial class GridCollisionManager : Node
 	private int _gridSize = 50;
 
 	// ========== DEBUG LOGGING ==========
-	private bool _verboseLogging = true;  // Set to false to reduce log spam
+	private bool _verboseLogging = false;  // Set to false to reduce log spam
 
 	// ========== INITIALIZATION ==========
 	public override void _EnterTree()

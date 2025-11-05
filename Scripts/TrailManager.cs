@@ -143,8 +143,6 @@ public partial class TrailManager : Node2D
 			if (currentPos.DistanceTo(trailData.CurrentWallStart) > 1.0f)
 			{
 				// Mark the current trail segment in the grid
-				string cycleName = cycle.Name;
-				GD.Print($"[TrailManager] Updating trail for {cycleName}: {trailData.CurrentWallStart} → {currentPos} (type: {trailData.TrailType})");
 				GridCollisionManager.Instance.SetLine(trailData.CurrentWallStart, currentPos, trailData.TrailType);
 			}
 		}
