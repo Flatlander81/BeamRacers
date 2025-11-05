@@ -27,6 +27,7 @@ public partial class Main : Node2D
 	private bool _gameStarted = false;
 	private GameManager _gameManager;
 	private TrailManager _trailManager;
+	private RoomManager _roomManager;
 	private Player _player;
 	private Arena _arena;
 	private EnemySpawner _enemySpawner;
@@ -55,6 +56,12 @@ public partial class Main : Node2D
 		_enemySpawner.Name = "EnemySpawner";
 		AddChild(_enemySpawner);
 		GD.Print("[Main] ✓ EnemySpawner initialized");
+
+		// Initialize RoomManager
+		_roomManager = new RoomManager();
+		_roomManager.Name = "RoomManager";
+		AddChild(_roomManager);
+		GD.Print("[Main] ✓ RoomManager initialized");
 
 		// Create the start screen UI
 		CreateStartScreen();
@@ -190,10 +197,18 @@ public partial class Main : Node2D
 		// Spawn the player
 		SpawnPlayer();
 
-		// Spawn enemies after player and arena are ready
-		SpawnEnemies();
+		// Initialize RoomManager with references
+		if (_roomManager != null)
+		{
+			_roomManager.Initialize(_player, _arena, _enemySpawner);
+			_roomManager.OnRoomStarted += OnRoomStarted;
+		}
 
-		GD.Print("[Main] ✓ Game start sequence complete\n");
+		// Start Room 1 via RoomManager (replaces direct SpawnEnemies call)
+		if (_roomManager != null)
+		{
+			_roomManager.StartRoom(1);
+		}
 	}
 
 	/// <summary>
@@ -494,4 +509,59 @@ public partial class Main : Node2D
 	/// Public method to get the camera
 	/// </summary>
 	public Camera2D GetCamera() => _camera;
+
+	// ========== ROOM MANAGEMENT ==========
+
+	/// <summary>
+	/// Called when RoomManager starts a new room
+	/// Handles arena generation and enemy spawning
+	/// </summary>
+	private void OnRoomStarted(int roomNumber)
+	{
+		// Clear old enemies
+		if (_enemySpawner != null)
+		{
+			_enemySpawner.ClearAllEnemies();
+		}
+
+		// Clear player trail
+		if (_player != null)
+		{
+			_player.ClearTrail();
+		}
+
+		// Reset player position
+		if (_player != null)
+		{
+			_player.ResetPosition(Vector2.Zero);
+		}
+
+		// Generate arena with scaling
+		if (_arena != null && _roomManager != null)
+		{
+			float scale = _roomManager.GetArenaSizeScale(roomNumber);
+			_arena.GenerateArena(roomNumber, scale);
+		}
+
+		// Spawn enemies
+		if (_enemySpawner != null && _player != null && _arena != null)
+		{
+			Rect2 arenaBounds = _arena.GetArenaBounds();
+			_enemySpawner.SpawnEnemies(
+				roomNumber,
+				_player.GlobalPosition,
+				_gameLayer,
+				arenaBounds,
+				GridSize
+			);
+
+			int enemyCount = _enemySpawner.GetActiveEnemyCount();
+
+			// Notify RoomManager that setup is complete
+			if (_roomManager != null)
+			{
+				_roomManager.NotifyRoomSetupComplete(enemyCount);
+			}
+		}
+	}
 }
