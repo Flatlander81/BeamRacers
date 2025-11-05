@@ -487,17 +487,71 @@ public partial class Main : Node2D
 					GD.Print("[Main] ⚡ F6 pressed - Generating PROCEDURAL arena (random)");
 					break;
 				case Key.F7:
-					_arena.GenerateArenaByTemplate(5); // Collision Test Arena
-					GD.Print("[Main] ⚡ F7 pressed - Loading 'Collision Test' arena (DEBUG MODE)");
-					// Start comprehensive automated test suite
-					if (_collisionTestController != null && _player != null && _gameLayer != null)
-					{
-						_collisionTestController.StartTests(_player, _gameLayer);
-						GD.Print("[Main] 🤖 COMPREHENSIVE COLLISION TEST SUITE STARTED");
-					}
+					GD.Print("[Main] ⚡ F7 pressed - Initializing COLLISION TEST MODE");
+					ResetForCollisionTest();
 					break;
 			}
 		}
+	}
+
+	/// <summary>
+	/// Resets game state for collision testing
+	/// </summary>
+	private void ResetForCollisionTest()
+	{
+		GD.Print("\n[Main] ════════════ RESETTING FOR COLLISION TEST ════════════");
+
+		// 1. Clear all existing enemies
+		if (_gameLayer != null)
+		{
+			foreach (Node child in _gameLayer.GetChildren())
+			{
+				if (child is EnemyCycle)
+				{
+					child.QueueFree();
+				}
+			}
+			GD.Print("[Main] ✓ Cleared all enemies");
+		}
+
+		// 2. Reset player to starting position
+		if (_player != null)
+		{
+			_player.GlobalPosition = Vector2.Zero;
+			_player.Set("_currentDirection", 0); // Facing RIGHT
+			_player.Rotation = 0;
+			_player.Set("_isDead", false);
+			_player.Set("_inputEnabled", true);
+			_player.Velocity = Vector2.Zero;
+
+			// Clear player trail
+			_player.ClearTrail();
+			GD.Print("[Main] ✓ Player reset to (0, 0) facing RIGHT");
+		}
+
+		// 3. Clear all trails from grid
+		if (GridCollisionManager.Instance != null)
+		{
+			GridCollisionManager.Instance.ClearCellsOfType(CellOccupant.PlayerTrail);
+			GridCollisionManager.Instance.ClearCellsOfType(CellOccupant.EnemyTrail);
+			GD.Print("[Main] ✓ Cleared all trails from grid");
+		}
+
+		// 4. Load collision test arena
+		if (_arena != null)
+		{
+			_arena.GenerateArenaByTemplate(5);
+			GD.Print("[Main] ✓ Loaded Collision Test Arena");
+		}
+
+		// 5. Start automated test suite
+		if (_collisionTestController != null && _player != null && _gameLayer != null)
+		{
+			_collisionTestController.StartTests(_player, _gameLayer);
+			GD.Print("[Main] 🤖 COMPREHENSIVE COLLISION TEST SUITE STARTED");
+		}
+
+		GD.Print("[Main] ═══════════════════════════════════════════════════════\n");
 	}
 
 	/// <summary>

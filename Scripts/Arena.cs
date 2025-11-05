@@ -167,12 +167,13 @@ public partial class Arena : Node2D
 
 		// Template 6: "COLLISION TEST" - Forces specific collision scenarios for debugging
 		var collisionTest = new ArenaTemplate("Collision Test Arena", 0.1f);
-		// Create a narrow corridor forcing tight turns
-		// Player spawns at (0,0), corridor is 200 units wide (4 grid cells)
-		collisionTest.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-300, -100), 400, 0));  // Top wall
-		collisionTest.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-300, 100), 400, 0));   // Bottom wall
-		collisionTest.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(-500, 0), 200, Mathf.Pi / 2));  // Left wall
-		// Right side is open so player can enter the corridor and make sharp turns
+		// Create a narrow corridor on the RIGHT side forcing tight turns
+		// Player spawns at (0,0) facing RIGHT, corridor is 200 units wide (4 grid cells)
+		// Corridor runs from x=200 to x=500, y=-100 to y=100
+		collisionTest.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(350, -100), 300, 0));  // Top wall (horizontal)
+		collisionTest.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(350, 100), 300, 0));   // Bottom wall (horizontal)
+		collisionTest.AddObstacle(new ObstacleDefinition(ObstacleDefinition.Type.Wall, new Vector2(500, 0), 200, Mathf.Pi / 2));  // Right wall (vertical)
+		// Left side is open at x=200 so player drives straight into the corridor
 		_templates.Add(collisionTest);
 
 		GD.Print($"[Arena] ✓ Created {_templates.Count} arena templates");

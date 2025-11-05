@@ -95,7 +95,7 @@ public partial class CollisionTestController : Node
 				GD.Print("[TEST 2] Player Box Pattern");
 				GD.Print("Testing: Player creating closed loop");
 				GD.Print("════════════════════════════════════════");
-				ctrl.ResetPlayer(new Vector2(-300, 0), 0);
+				ctrl.ResetPlayer(new Vector2(0, 0), 0); // Start at origin facing right
 				ctrl.SetPlayerAutoTest(0, "box_pattern");
 			},
 			update: (ctrl, delta) => { }
@@ -112,8 +112,8 @@ public partial class CollisionTestController : Node
 				GD.Print("[TEST 3] Enemy vs Player Trail (Active)");
 				GD.Print("Testing: Enemy hitting currently-drawing player trail");
 				GD.Print("════════════════════════════════════════");
-				ctrl.ResetPlayer(new Vector2(-200, 0), 0); // Moving right
-				ctrl.SpawnTestEnemy(new Vector2(-200, 100), 3); // Moving up (will intersect)
+				ctrl.ResetPlayer(new Vector2(0, -50), 0); // Moving right
+				ctrl.SpawnTestEnemy(new Vector2(200, 100), 3); // Below, moving UP to cross player's horizontal trail
 				ctrl.SetPlayerAutoTest(0, "move_straight");
 			},
 			update: (ctrl, delta) => { }
@@ -130,11 +130,11 @@ public partial class CollisionTestController : Node
 				GD.Print("[TEST 4] Enemy vs Player Trail (Wall)");
 				GD.Print("Testing: Enemy hitting finalized player trail");
 				GD.Print("════════════════════════════════════════");
-				// Player creates a vertical wall
-				ctrl.ResetPlayer(new Vector2(-300, -150), 1); // Moving down
+				// Player creates a vertical wall by moving down then turning
+				ctrl.ResetPlayer(new Vector2(0, -150), 1); // Starting up high, moving DOWN
 				ctrl.SetPlayerAutoTest(0, "create_wall");
-				// Enemy will cross it after player finishes
-				ctrl.CallDeferred("SpawnDelayedEnemy", new Vector2(-350, 0), 0, 3.0f);
+				// Enemy will cross the vertical trail after player finishes
+				ctrl.CallDeferred("SpawnDelayedEnemy", new Vector2(-100, 0), 0, 3.0f); // Moving RIGHT to cross vertical trail
 			},
 			update: (ctrl, delta) => { }
 		));
@@ -150,8 +150,8 @@ public partial class CollisionTestController : Node
 				GD.Print("[TEST 5] Player vs Enemy Trail (Active)");
 				GD.Print("Testing: Player hitting currently-drawing enemy trail");
 				GD.Print("════════════════════════════════════════");
-				ctrl.SpawnTestEnemy(new Vector2(-200, -100), 1); // Enemy moving down
-				ctrl.ResetPlayer(new Vector2(-300, -100), 0); // Player moving right (will intersect)
+				ctrl.SpawnTestEnemy(new Vector2(200, -100), 1); // Enemy moving DOWN
+				ctrl.ResetPlayer(new Vector2(0, 0), 0); // Player moving RIGHT (will intersect vertical enemy trail)
 				ctrl.SetPlayerAutoTest(0, "move_straight");
 			},
 			update: (ctrl, delta) => { }
@@ -187,7 +187,7 @@ public partial class CollisionTestController : Node
 				GD.Print("Testing: Enemy hitting its own trail");
 				GD.Print("════════════════════════════════════════");
 				ctrl.ResetPlayer(new Vector2(0, 0), 0);
-				ctrl.SpawnTestEnemy(new Vector2(-300, -100), 0, "box_pattern");
+				ctrl.SpawnTestEnemy(new Vector2(-200, 0), 0, "box_pattern"); // Enemy starting left of center, moving right
 				ctrl.SetPlayerAutoTest(0, "idle");
 			},
 			update: (ctrl, delta) => { }
@@ -204,8 +204,8 @@ public partial class CollisionTestController : Node
 				GD.Print("[TEST 8] Player vs Obstacle");
 				GD.Print("Testing: Player collision with static obstacle");
 				GD.Print("════════════════════════════════════════");
-				// Aim player at the left wall obstacle in test arena
-				ctrl.ResetPlayer(new Vector2(-200, 0), 2); // Moving left toward wall
+				// Aim player at the right wall obstacle in test arena (at x=500)
+				ctrl.ResetPlayer(new Vector2(300, 0), 0); // Moving RIGHT toward right wall
 				ctrl.SetPlayerAutoTest(0, "move_straight");
 			},
 			update: (ctrl, delta) => { }
@@ -223,8 +223,8 @@ public partial class CollisionTestController : Node
 				GD.Print("Testing: Enemy-to-enemy collision");
 				GD.Print("════════════════════════════════════════");
 				ctrl.ResetPlayer(new Vector2(0, 0), 0);
-				ctrl.SpawnTestEnemy(new Vector2(-200, -100), 1); // Enemy 1 moving down
-				ctrl.SpawnTestEnemy(new Vector2(-250, 0), 0);    // Enemy 2 moving right (will cross)
+				ctrl.SpawnTestEnemy(new Vector2(100, -100), 1); // Enemy 1 moving DOWN
+				ctrl.SpawnTestEnemy(new Vector2(-100, 0), 0);    // Enemy 2 moving RIGHT (will cross enemy 1's vertical trail)
 				ctrl.SetPlayerAutoTest(0, "idle");
 			},
 			update: (ctrl, delta) => { }
