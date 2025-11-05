@@ -28,6 +28,7 @@ public partial class Main : Node2D
 	private GameManager _gameManager;
 	private GridCollisionManager _gridCollisionManager;
 	private TrailManager _trailManager;
+	private CollisionTestController _collisionTestController;
 	private Player _player;
 	private Arena _arena;
 	private EnemySpawner _enemySpawner;
@@ -63,6 +64,12 @@ public partial class Main : Node2D
 		_enemySpawner.Name = "EnemySpawner";
 		AddChild(_enemySpawner);
 		GD.Print("[Main] ✓ EnemySpawner initialized");
+
+		// Initialize collision test controller
+		_collisionTestController = new CollisionTestController();
+		_collisionTestController.Name = "CollisionTestController";
+		AddChild(_collisionTestController);
+		GD.Print("[Main] ✓ CollisionTestController initialized");
 
 		// Create the start screen UI
 		CreateStartScreen();
@@ -482,11 +489,11 @@ public partial class Main : Node2D
 				case Key.F7:
 					_arena.GenerateArenaByTemplate(5); // Collision Test Arena
 					GD.Print("[Main] ⚡ F7 pressed - Loading 'Collision Test' arena (DEBUG MODE)");
-					// Enable automated test mode if available
-					if (_player != null)
+					// Start comprehensive automated test suite
+					if (_collisionTestController != null && _player != null && _gameLayer != null)
 					{
-						_player.Set("_autoTestMode", true);
-						GD.Print("[Main] 🤖 Automated test mode ENABLED");
+						_collisionTestController.StartTests(_player, _gameLayer);
+						GD.Print("[Main] 🤖 COMPREHENSIVE COLLISION TEST SUITE STARTED");
 					}
 					break;
 			}

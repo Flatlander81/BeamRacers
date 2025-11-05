@@ -38,6 +38,12 @@ public partial class EnemyCycle : GridCycle
 	// ========== TRAIL AVOIDANCE ==========
 	private const float AVOIDANCE_CHECK_DISTANCE = 150.0f;
 
+	// ========== AUTOMATED TEST MODE ==========
+	private bool _autoTestMode = false;
+	private float _autoTestTimer = 0.0f;
+	private int _autoTestStep = 0;
+	private string _autoTestPattern = "move_straight";
+
 	// ========== INITIALIZATION ==========
 	public override void _Ready()
 	{
@@ -149,6 +155,13 @@ public partial class EnemyCycle : GridCycle
 	/// </summary>
 	private void ProcessAI(float delta)
 	{
+		// Handle automated test mode
+		if (_autoTestMode)
+		{
+			ProcessAutomatedTest(delta);
+			return;
+		}
+
 		if (_player == null) return;
 
 		// Make decisions at intervals
@@ -193,6 +206,59 @@ public partial class EnemyCycle : GridCycle
 			{
 				_queuedDirection = rightDirection;
 			}
+		}
+	}
+
+	/// <summary>
+	/// Automated test sequence for enemy
+	/// </summary>
+	private void ProcessAutomatedTest(float delta)
+	{
+		_autoTestTimer += delta;
+
+		switch (_autoTestPattern)
+		{
+			case "move_straight":
+				// Just move straight - no turns
+				break;
+			case "box_pattern":
+				ProcessBoxPattern();
+				break;
+			case "turn_left":
+				if (_autoTestTimer > 1.0f && _queuedDirection == null)
+				{
+					GD.Print("[Enemy AutoTest] Turning LEFT");
+					_queuedDirection = (_currentDirection + 3) % 4;
+					_autoTestTimer = 0.0f;
+				}
+				break;
+			case "turn_right":
+				if (_autoTestTimer > 1.0f && _queuedDirection == null)
+				{
+					GD.Print("[Enemy AutoTest] Turning RIGHT");
+					_queuedDirection = (_currentDirection + 1) % 4;
+					_autoTestTimer = 0.0f;
+				}
+				break;
+		}
+	}
+
+	private void ProcessBoxPattern()
+	{
+		switch (_autoTestStep)
+		{
+			case 0:
+			case 1:
+			case 2:
+			case 3:
+				if (_autoTestTimer > 1.2f && _queuedDirection == null)
+				{
+					GD.Print($"[Enemy AutoTest] Box turn {_autoTestStep + 1}: LEFT");
+					_queuedDirection = (_currentDirection + 3) % 4;
+					_autoTestTimer = 0.0f;
+					_autoTestStep++;
+				}
+				break;
 		}
 	}
 

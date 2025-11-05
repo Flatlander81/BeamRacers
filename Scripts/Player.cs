@@ -40,6 +40,7 @@ public partial class Player : GridCycle
 	private bool _autoTestMode = false;
 	private float _autoTestTimer = 0.0f;
 	private int _autoTestStep = 0;
+	private string _autoTestPattern = "rapid_double_turn";
 
 	// ========== INITIALIZATION ==========
 	public override void _Ready()
@@ -253,65 +254,98 @@ public partial class Player : GridCycle
 	{
 		_autoTestTimer += delta;
 
-		// Test sequence: Move in a pattern that creates rapid turns
-		// This is designed to test collision detection with our own trail
+		switch (_autoTestPattern)
+		{
+			case "rapid_double_turn":
+				ProcessRapidDoubleTurn();
+				break;
+			case "box_pattern":
+				ProcessBoxPattern();
+				break;
+			case "move_straight":
+				// Just move straight - no turns
+				break;
+			case "create_wall":
+				ProcessCreateWall();
+				break;
+			case "idle":
+				// Don't move at all
+				Velocity = Vector2.Zero;
+				break;
+			case "boundary_dance":
+				ProcessBoundaryDance();
+				break;
+		}
+	}
+
+	private void ProcessRapidDoubleTurn()
+	{
 		switch (_autoTestStep)
 		{
-			case 0: // Initial: Move left for 1.5 seconds
-				if (_autoTestTimer > 1.5f && _queuedDirection == null)
+			case 0:
+				if (_autoTestTimer > 1.0f && _queuedDirection == null)
 				{
-					GD.Print("[AutoTest] Step 0 → 1: Turning LEFT");
-					_queuedDirection = (_currentDirection + 3) % 4; // Turn left
+					GD.Print("[AutoTest] Rapid turn 1: LEFT");
+					_queuedDirection = (_currentDirection + 3) % 4;
 					_autoTestTimer = 0.0f;
 					_autoTestStep = 1;
 				}
 				break;
-
-			case 1: // After 0.5 seconds, turn left again (rapid double turn)
-				if (_autoTestTimer > 0.5f && _queuedDirection == null)
+			case 1:
+				if (_autoTestTimer > 0.3f && _queuedDirection == null)
 				{
-					GD.Print("[AutoTest] Step 1 → 2: Turning LEFT AGAIN (rapid double-turn test)");
-					_queuedDirection = (_currentDirection + 3) % 4; // Turn left again
+					GD.Print("[AutoTest] Rapid turn 2: LEFT (RAPID DOUBLE-TURN)");
+					_queuedDirection = (_currentDirection + 3) % 4;
 					_autoTestTimer = 0.0f;
 					_autoTestStep = 2;
 				}
 				break;
+		}
+	}
 
-			case 2: // Move for 1.0 seconds
-				if (_autoTestTimer > 1.0f && _queuedDirection == null)
+	private void ProcessBoxPattern()
+	{
+		switch (_autoTestStep)
+		{
+			case 0:
+			case 1:
+			case 2:
+			case 3:
+				if (_autoTestTimer > 1.5f && _queuedDirection == null)
 				{
-					GD.Print("[AutoTest] Step 2 → 3: Turning LEFT (starting box pattern)");
+					GD.Print($"[AutoTest] Box turn {_autoTestStep + 1}: LEFT");
 					_queuedDirection = (_currentDirection + 3) % 4;
 					_autoTestTimer = 0.0f;
-					_autoTestStep = 3;
+					_autoTestStep++;
 				}
 				break;
+		}
+	}
 
-			case 3: // Complete a square to cross our own trail
-				if (_autoTestTimer > 1.0f && _queuedDirection == null)
+	private void ProcessCreateWall()
+	{
+		if (_autoTestStep == 0 && _autoTestTimer > 2.0f && _queuedDirection == null)
+		{
+			GD.Print("[AutoTest] Wall created, turning");
+			_queuedDirection = (_currentDirection + 1) % 4;
+			_autoTestStep = 1;
+		}
+	}
+
+	private void ProcessBoundaryDance()
+	{
+		// Make quick turns near boundary
+		switch (_autoTestStep)
+		{
+			case 0:
+			case 1:
+			case 2:
+				if (_autoTestTimer > 0.8f && _queuedDirection == null)
 				{
-					GD.Print("[AutoTest] Step 3 → 4: Turning LEFT (continuing box)");
+					GD.Print($"[AutoTest] Boundary dance turn {_autoTestStep + 1}");
 					_queuedDirection = (_currentDirection + 3) % 4;
 					_autoTestTimer = 0.0f;
-					_autoTestStep = 4;
-				}
-				break;
-
-			case 4: // Final turn to attempt crossing our trail
-				if (_autoTestTimer > 1.0f && _queuedDirection == null)
-				{
-					GD.Print("[AutoTest] Step 4 → 5: Turning LEFT (should cross trail soon)");
-					_queuedDirection = (_currentDirection + 3) % 4;
-					_autoTestTimer = 0.0f;
-					_autoTestStep = 5;
-				}
-				break;
-
-			case 5: // Let it run to see if collision detection works
-				if (_autoTestTimer > 2.0f)
-				{
-					GD.Print("[AutoTest] Test sequence complete - Collision should have occurred or system is working");
-					_autoTestMode = false;
+					_autoTestStep++;
 				}
 				break;
 		}
