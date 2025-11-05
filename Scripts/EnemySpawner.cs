@@ -7,6 +7,10 @@ using System.Collections.Generic;
 /// </summary>
 public partial class EnemySpawner : Node
 {
+	// ========== SIGNALS ==========
+	[Signal]
+	public delegate void OnEnemyDiedEventHandler();
+
 	// ========== ENEMY TRACKING ==========
 	private List<EnemyCycle> _activeEnemies = new List<EnemyCycle>();
 
@@ -101,7 +105,7 @@ public partial class EnemySpawner : Node
 			enemy.ArenaBounds = arenaBounds;
 
 			// Connect to death signal
-			enemy.OnEnemyDied += () => OnEnemyDied(enemy);
+			enemy.OnEnemyDied += () => HandleEnemyDied(enemy);
 
 			// Add to container
 			container.AddChild(enemy);
@@ -273,11 +277,14 @@ public partial class EnemySpawner : Node
 	/// <summary>
 	/// Called when an enemy dies
 	/// </summary>
-	private void OnEnemyDied(EnemyCycle enemy)
+	private void HandleEnemyDied(EnemyCycle enemy)
 	{
 		// Remove from tracking list
 		_activeEnemies.Remove(enemy);
 
 		GD.Print($"[EnemySpawner] Enemy died. Remaining: {_activeEnemies.Count}");
+
+		// Emit signal for room management
+		EmitSignal(SignalName.OnEnemyDied);
 	}
 }
