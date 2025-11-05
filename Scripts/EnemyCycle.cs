@@ -265,12 +265,17 @@ public partial class EnemyCycle : GridCycle
 	{
 		if (GridCollisionManager.Instance == null) return;
 
-		CellOccupant occupant = GridCollisionManager.Instance.GetCell(GlobalPosition);
+		// Check the cell ahead of us in our movement direction, not our current cell
+		// This prevents hitting our own currently-drawing trail while allowing others to hit it
+		Vector2 directionVector = GetDirectionVector();
+		Vector2 checkPosition = GlobalPosition + directionVector * (GridSize / 2.0f);
+
+		CellOccupant occupant = GridCollisionManager.Instance.GetCell(checkPosition);
 
 		// Check if we hit anything that would kill us
 		if (occupant != CellOccupant.Empty)
 		{
-			GD.Print($"[EnemyCycle] Hit {occupant} at {GlobalPosition}");
+			GD.Print($"[EnemyCycle] Hit {occupant} at {checkPosition}");
 			Die();
 		}
 	}

@@ -146,7 +146,12 @@ public partial class Player : GridCycle
 	{
 		if (!_inputEnabled || GridCollisionManager.Instance == null) return;
 
-		CellOccupant occupant = GridCollisionManager.Instance.GetCell(GlobalPosition);
+		// Check the cell ahead of us in our movement direction, not our current cell
+		// This prevents hitting our own currently-drawing trail while allowing others to hit it
+		Vector2 directionVector = GetDirectionVector();
+		Vector2 checkPosition = GlobalPosition + directionVector * (GridSize / 2.0f);
+
+		CellOccupant occupant = GridCollisionManager.Instance.GetCell(checkPosition);
 
 		// Check if we hit anything
 		if (occupant != CellOccupant.Empty)
@@ -164,7 +169,7 @@ public partial class Player : GridCycle
 			}
 
 			// Otherwise, player dies
-			GD.Print($"[Player] Hit {occupant} at {GlobalPosition}");
+			GD.Print($"[Player] Hit {occupant} at {checkPosition}");
 			Die();
 		}
 	}
