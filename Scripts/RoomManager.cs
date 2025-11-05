@@ -54,9 +54,7 @@ public partial class RoomManager : Node
 
 	public override void _Ready()
 	{
-		GD.Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-		GD.Print("[RoomManager] Initializing Room Manager");
-		GD.Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		// Silent initialization
 	}
 
 	/// <summary>
@@ -72,7 +70,6 @@ public partial class RoomManager : Node
 		if (_enemySpawner != null)
 		{
 			_enemySpawner.OnEnemyDied += OnEnemyDefeated;
-			GD.Print("[RoomManager] ✓ Subscribed to EnemySpawner.OnEnemyDied");
 		}
 		else
 		{
@@ -83,10 +80,7 @@ public partial class RoomManager : Node
 		if (GameManager.Instance != null)
 		{
 			GameManager.Instance.OnRoomChanged += OnGameManagerRoomChanged;
-			GD.Print("[RoomManager] ✓ Subscribed to GameManager.OnRoomChanged");
 		}
-
-		GD.Print("[RoomManager] ✓ Initialization complete");
 	}
 
 	// ========== ROOM LIFECYCLE ==========
@@ -107,10 +101,7 @@ public partial class RoomManager : Node
 		CurrentRoom = roomNumber;
 		RoomStartTime = Time.GetTicksMsec() / 1000f;
 
-		GD.Print("");
-		GD.Print("═══════════════════════════════════════");
-		GD.Print($"[RoomManager] >>> STARTING ROOM {CurrentRoom} <<<");
-		GD.Print("═══════════════════════════════════════");
+		GD.Print($"\n[RoomManager] Starting Room {CurrentRoom}/20");
 
 		// Emit signal for Main.cs to handle setup
 		EmitSignal(SignalName.OnRoomStarted, CurrentRoom);
@@ -125,9 +116,7 @@ public partial class RoomManager : Node
 	public void NotifyRoomSetupComplete(int enemyCount)
 	{
 		EnemiesRemaining = enemyCount;
-		GD.Print($"[RoomManager] Room {CurrentRoom} ready: {EnemiesRemaining} enemies");
-		GD.Print("═══════════════════════════════════════");
-		GD.Print("");
+		GD.Print($"[RoomManager] {EnemiesRemaining} enemies spawned");
 	}
 
 	/// <summary>
@@ -144,7 +133,10 @@ public partial class RoomManager : Node
 		EnemiesRemaining--;
 		EmitSignal(SignalName.OnEnemiesChanged, EnemiesRemaining);
 
-		GD.Print($"[RoomManager] Enemy defeated: {EnemiesRemaining} remaining");
+		if (EnemiesRemaining > 0)
+		{
+			GD.Print($"[RoomManager] Enemy defeated - {EnemiesRemaining} remaining");
+		}
 
 		// Check if room is cleared
 		if (EnemiesRemaining == 0)
@@ -160,31 +152,24 @@ public partial class RoomManager : Node
 	{
 		float clearTime = Time.GetTicksMsec() / 1000f - RoomStartTime;
 		int totalBonus = BASE_CLEAR_BONUS;
-
-		GD.Print("");
-		GD.Print("═══════════════════════════════════════");
-		GD.Print($"[RoomManager] >>> ROOM {CurrentRoom} CLEARED <<<");
-		GD.Print("═══════════════════════════════════════");
+		string speedBonus = "";
 
 		// Calculate fast clear bonuses
 		if (clearTime < 20f)
 		{
 			totalBonus += FAST_CLEAR_BONUS_20S;
-			GD.Print($"[RoomManager] ⚡ Lightning Fast! (<20s) +{FAST_CLEAR_BONUS_20S} cycles");
+			speedBonus = " ⚡ LIGHTNING FAST!";
 		}
 		else if (clearTime < 30f)
 		{
 			totalBonus += FAST_CLEAR_BONUS_30S;
-			GD.Print($"[RoomManager] ⚡ Fast Clear! (<30s) +{FAST_CLEAR_BONUS_30S} cycles");
+			speedBonus = " ⚡ Fast!";
 		}
 
 		// Award bonuses
 		GameManager.Instance?.AddClockCycles(totalBonus);
 
-		GD.Print($"[RoomManager] Time: {clearTime:F1}s");
-		GD.Print($"[RoomManager] Bonus: +{totalBonus} cycles");
-		GD.Print("═══════════════════════════════════════");
-		GD.Print("");
+		GD.Print($"\n[RoomManager] ROOM {CurrentRoom} CLEARED - {clearTime:F1}s - +{totalBonus} cycles{speedBonus}\n");
 
 		// Emit signal
 		EmitSignal(SignalName.OnRoomCleared);
@@ -192,13 +177,10 @@ public partial class RoomManager : Node
 		// Handle progression
 		if (CurrentRoom < MAX_ROOMS)
 		{
-			GD.Print($"[RoomManager] Preparing for Room {CurrentRoom + 1}...");
 			// Wait 1 second before next room
 			GetTree().CreateTimer(1.0).Timeout += () =>
 			{
 				// TODO: Show power-up selection here (future feature)
-				GD.Print("[RoomManager] Power-up selection placeholder");
-
 				// Advance to next room
 				GameManager.Instance?.NextRoom();
 			};
@@ -206,7 +188,7 @@ public partial class RoomManager : Node
 		else
 		{
 			// Final room cleared - Victory!
-			GD.Print("[RoomManager] 🎉 ALL ROOMS CLEARED - VICTORY! 🎉");
+			GD.Print("\n[RoomManager] 🎉 ALL ROOMS CLEARED - VICTORY! 🎉\n");
 			GameManager.Instance?.Victory();
 		}
 	}
@@ -216,8 +198,6 @@ public partial class RoomManager : Node
 	/// </summary>
 	private void OnGameManagerRoomChanged(int newRoom)
 	{
-		GD.Print($"[RoomManager] GameManager room changed to {newRoom}");
-
 		// Start the new room
 		StartRoom(newRoom);
 	}

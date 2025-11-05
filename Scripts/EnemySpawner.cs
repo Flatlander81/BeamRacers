@@ -78,8 +78,7 @@ public partial class EnemySpawner : Node
 		// Determine enemy speed
 		float enemySpeed = CalculateEnemySpeed(roomNumber);
 
-		GD.Print($"[EnemySpawner] ═══ Spawning {enemyCount} enemies for Room {roomNumber} ═══");
-		GD.Print($"[EnemySpawner] Arena bounds: {arenaBounds}");
+		// Silent spawn
 
 		// Track spawn positions to ensure spacing
 		List<Vector2> spawnPositions = new List<Vector2>();
@@ -112,14 +111,7 @@ public partial class EnemySpawner : Node
 
 			// Track enemy
 			_activeEnemies.Add(enemy);
-
-			// Calculate distance from player
-			float distFromPlayer = spawnPos.DistanceTo(playerPosition);
-
-			GD.Print($"[EnemySpawner] Spawned enemy {i + 1} at {spawnPos}, speed: {enemySpeed}, distance from player: {distFromPlayer:F0}");
 		}
-
-		GD.Print($"[EnemySpawner] ✓ {_activeEnemies.Count} enemies active");
 	}
 
 	/// <summary>
@@ -127,8 +119,6 @@ public partial class EnemySpawner : Node
 	/// </summary>
 	public void ClearAllEnemies()
 	{
-		GD.Print($"[EnemySpawner] Clearing {_activeEnemies.Count} enemies...");
-
 		// Copy list to avoid modification during iteration
 		var enemiesToRemove = new List<EnemyCycle>(_activeEnemies);
 
@@ -141,8 +131,6 @@ public partial class EnemySpawner : Node
 		}
 
 		_activeEnemies.Clear();
-
-		GD.Print("[EnemySpawner] ✓ All enemies cleared");
 	}
 
 	/// <summary>
@@ -281,8 +269,6 @@ public partial class EnemySpawner : Node
 	{
 		// Remove from tracking list
 		_activeEnemies.Remove(enemy);
-
-		GD.Print($"[EnemySpawner] Enemy died. Remaining: {_activeEnemies.Count}");
 
 		// Emit signal for room management
 		EmitSignal(SignalName.OnEnemyDied);

@@ -202,7 +202,6 @@ public partial class Main : Node2D
 		{
 			_roomManager.Initialize(_player, _arena, _enemySpawner);
 			_roomManager.OnRoomStarted += OnRoomStarted;
-			GD.Print("[Main] ✓ RoomManager connected");
 		}
 
 		// Start Room 1 via RoomManager (replaces direct SpawnEnemies call)
@@ -210,8 +209,6 @@ public partial class Main : Node2D
 		{
 			_roomManager.StartRoom(1);
 		}
-
-		GD.Print("[Main] ✓ Game start sequence complete\n");
 	}
 
 	/// <summary>
@@ -521,27 +518,22 @@ public partial class Main : Node2D
 	/// </summary>
 	private void OnRoomStarted(int roomNumber)
 	{
-		GD.Print($"[Main] Setting up room {roomNumber}...");
-
 		// Clear old enemies
 		if (_enemySpawner != null)
 		{
 			_enemySpawner.ClearAllEnemies();
-			GD.Print("[Main] ✓ Cleared old enemies");
 		}
 
 		// Clear player trail
 		if (_player != null)
 		{
 			_player.ClearTrail();
-			GD.Print("[Main] ✓ Cleared player trail");
 		}
 
 		// Reset player position
 		if (_player != null)
 		{
 			_player.ResetPosition(Vector2.Zero);
-			GD.Print("[Main] ✓ Reset player to (0, 0)");
 		}
 
 		// Generate arena with scaling
@@ -549,7 +541,6 @@ public partial class Main : Node2D
 		{
 			float scale = _roomManager.GetArenaSizeScale(roomNumber);
 			_arena.GenerateArena(roomNumber, scale);
-			GD.Print($"[Main] ✓ Generated arena (scale: {scale:F2})");
 		}
 
 		// Spawn enemies
@@ -571,8 +562,6 @@ public partial class Main : Node2D
 			{
 				_roomManager.NotifyRoomSetupComplete(enemyCount);
 			}
-
-			GD.Print($"[Main] ✓ Spawned {enemyCount} enemies");
 		}
 	}
 }
