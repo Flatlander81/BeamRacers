@@ -7,7 +7,7 @@ using Godot;
 public abstract partial class GridCycle : CharacterBody2D
 {
 	// ========== GRID PARAMETERS ==========
-	public int GridSize = 50;
+	protected int GridSize => GridCollisionManager.Instance?.GetGridSize() ?? 50;
 
 	// ========== MOVEMENT STATE ==========
 	protected int _currentDirection = 0; // 0=right, 1=down, 2=left, 3=up

@@ -56,6 +56,14 @@ public partial class GridCollisionManager : Node
 		_gridSize = size;
 	}
 
+	/// <summary>
+	/// Gets the current grid cell size
+	/// </summary>
+	public int GetGridSize()
+	{
+		return _gridSize;
+	}
+
 	// ========== CELL MANAGEMENT ==========
 
 	/// <summary>
