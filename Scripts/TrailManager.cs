@@ -133,17 +133,43 @@ public partial class TrailManager : Node2D
 		// Update visual (includes current wall being drawn)
 		UpdateTrailVisual(trailData);
 
-		// Update grid collision for current wall segment
-		// Mark it in the grid so OTHER cycles can collide with it
-		// The cycle that owns this trail will skip their current grid cell in collision check
+		// Update grid collision - only mark cells the cycle has EXITED
+		// This prevents cycles from colliding with their own current position
 		if (GridCollisionManager.Instance != null && trailData.HasWallStart &&
 		    trailData.Owner != null && IsInstanceValid(trailData.Owner))
 		{
 			Vector2 currentPos = trailData.Owner.GlobalPosition;
-			if (currentPos.DistanceTo(trailData.CurrentWallStart) > 1.0f)
+			Vector2I currentGridCell = GridCollisionManager.Instance.WorldToGrid(currentPos);
+
+			// Check if cycle has moved to a new grid cell
+			if (!trailData.CurrentGridCell.HasValue)
 			{
-				// Mark the current trail segment in the grid
-				GridCollisionManager.Instance.SetLine(trailData.CurrentWallStart, currentPos, trailData.TrailType);
+				// First frame - just track the current cell
+				trailData.CurrentGridCell = currentGridCell;
+				trailData.LastMarkedCell = currentGridCell;
+			}
+			else if (trailData.CurrentGridCell.Value != currentGridCell)
+			{
+				// Cycle has moved to a new cell - mark the line from last marked cell to previous cell
+				Vector2I previousCell = trailData.CurrentGridCell.Value;
+
+				// Mark cells from LastMarkedCell up to (but not including) the current cell
+				if (trailData.LastMarkedCell.HasValue && currentPos.DistanceTo(trailData.CurrentWallStart) > 1.0f)
+				{
+					// Calculate the position at the edge of the previous cell
+					Vector2 previousCellWorldPos = GridCollisionManager.Instance.GridToWorld(previousCell);
+
+					// Mark the line from CurrentWallStart to the previous cell position
+					// This marks all cells the cycle has EXITED but not the current cell
+					GridCollisionManager.Instance.SetLine(trailData.CurrentWallStart, previousCellWorldPos, trailData.TrailType);
+
+					// Update tracking - the wall start is now at the previous cell position
+					trailData.CurrentWallStart = previousCellWorldPos;
+				}
+
+				// Update current cell tracking
+				trailData.CurrentGridCell = currentGridCell;
+				trailData.LastMarkedCell = previousCell;
 			}
 		}
 	}
@@ -313,5 +339,7 @@ public partial class TrailManager : Node2D
 		public List<TrailWall> Walls;
 		public Vector2 CurrentWallStart;
 		public bool HasWallStart;
+		public Vector2I? CurrentGridCell;  // The grid cell the cycle is currently occupying
+		public Vector2I? LastMarkedCell;   // The last cell we marked in the grid
 	}
 }
