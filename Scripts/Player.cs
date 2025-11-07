@@ -42,6 +42,7 @@ public partial class Player : GridCycle
 	private int _autoTestStep = 0;
 	private string _autoTestPattern = "rapid_double_turn";
 	private bool _collisionTestMode = false;  // When true, log collisions but don't die
+	private bool _hasReportedCollision = false;  // Track if we've already reported a collision in test mode
 
 	// ========== INITIALIZATION ==========
 	public override void _Ready()
@@ -182,7 +183,12 @@ public partial class Player : GridCycle
 			// Otherwise, player dies (or just logs in test mode)
 			if (_collisionTestMode)
 			{
-				GD.Print($"[Player] 🧪 TEST MODE COLLISION: Would have died hitting {occupant} at {checkPosition} (grid {checkGrid})");
+				if (!_hasReportedCollision)
+				{
+					GD.Print($"[Player] 🧪 TEST MODE COLLISION: Would have died hitting {occupant} at {checkPosition} (grid {checkGrid})");
+					CollisionTestController.Instance?.RecordCollision("Player Collision", $"Hit {occupant}");
+					_hasReportedCollision = true;
+				}
 			}
 			else
 			{
@@ -203,7 +209,12 @@ public partial class Player : GridCycle
 		{
 			if (_collisionTestMode)
 			{
-				GD.Print($"[Player] 🧪 TEST MODE: Would have died leaving grid boundary at {GlobalPosition}");
+				if (!_hasReportedCollision)
+				{
+					GD.Print($"[Player] 🧪 TEST MODE: Would have died leaving grid boundary at {GlobalPosition}");
+					CollisionTestController.Instance?.RecordCollision("Player Boundary", "Left grid boundary");
+					_hasReportedCollision = true;
+				}
 			}
 			else
 			{

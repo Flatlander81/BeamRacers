@@ -163,8 +163,8 @@ public partial class TrailManager : Node2D
 					// This marks all cells the cycle has EXITED but not the current cell
 					GridCollisionManager.Instance.SetLine(trailData.CurrentWallStart, previousCellWorldPos, trailData.TrailType);
 
-					// Update tracking - the wall start is now at the previous cell position
-					trailData.CurrentWallStart = previousCellWorldPos;
+					// NOTE: We do NOT update CurrentWallStart here - it should remain at the turn point
+					// so the visual trail renders correctly from turn to current position
 				}
 
 				// Update current cell tracking

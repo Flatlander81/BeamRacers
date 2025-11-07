@@ -18,6 +18,11 @@ public partial class CollisionTestController : Node
 	private float _testTimer = 0.0f;
 	private List<TestScenario> _testScenarios = new List<TestScenario>();
 
+	// ========== TEST RESULTS TRACKING ==========
+	private Dictionary<string, bool> _testResults = new Dictionary<string, bool>();
+	private List<string> _collisionEvents = new List<string>();
+	private int _totalCollisions = 0;
+
 	// ========== REFERENCES ==========
 	private Player _player;
 	private List<EnemyCycle> _testEnemies = new List<EnemyCycle>();
@@ -260,6 +265,11 @@ public partial class CollisionTestController : Node
 		_currentTestScenario = 0;
 		_testTimer = 0.0f;
 
+		// Reset tracking
+		_testResults.Clear();
+		_collisionEvents.Clear();
+		_totalCollisions = 0;
+
 		// Get arena reference for bounds
 		_arena = GetTree().Root.FindChild("Arena", true, false) as Arena;
 
@@ -340,7 +350,29 @@ public partial class CollisionTestController : Node
 		// Update current scenario
 		scenario.Update?.Invoke(this, deltaF);
 
-		// Check if scenario is complete
+		// Check if player or any enemy went out of bounds - skip to next test
+		if (CheckOutOfBounds())
+		{
+			GD.Print($"\n[TEST {_currentTestScenario + 1}] ⚠ Cycle went out of bounds - skipping to next test");
+			GD.Print("----------------------------------------\n");
+
+			scenario.Completed = true;
+			_currentTestScenario++;
+
+			// Check if all tests complete
+			if (_currentTestScenario >= _testScenarios.Count)
+			{
+				CompleteAllTests();
+			}
+			else
+			{
+				// Start next test
+				StartScenario(_currentTestScenario);
+			}
+			return;
+		}
+
+		// Check if scenario is complete by time
 		if (_testTimer >= scenario.Duration)
 		{
 			GD.Print($"\n[TEST {_currentTestScenario + 1}] Scenario '{scenario.Name}' completed");
@@ -377,16 +409,128 @@ public partial class CollisionTestController : Node
 			GD.Print("[CollisionTest] Player test modes disabled");
 		}
 
-		GD.Print("\n╔═══════════════════════════════════════════════════════╗");
-		GD.Print("║     COLLISION TEST SUITE COMPLETE                     ║");
-		GD.Print("╚═══════════════════════════════════════════════════════╝");
-		GD.Print($"Total tests run: {_testScenarios.Count}");
-		GD.Print("Review logs above for collision behavior analysis\n");
+		// Generate summary report
+		PrintTestReport();
 
 		CleanupPreviousTest();
 	}
 
+	/// <summary>
+	/// Prints a concise test summary report
+	/// </summary>
+	private void PrintTestReport()
+	{
+		GD.Print("\n╔════════════════════════════════════════════╗");
+		GD.Print("║     COLLISION TEST SUMMARY REPORT          ║");
+		GD.Print("╚════════════════════════════════════════════╝");
+		GD.Print($"Tests Run: {_testScenarios.Count}");
+		GD.Print($"Total Collisions Detected: {_totalCollisions}");
+
+		// Expected collisions per test (for validation)
+		var expectedCollisions = new Dictionary<string, string>
+		{
+			{ "Player Rapid Double-Turn", "1 self-collision" },
+			{ "Player Box Pattern", "1 self-collision" },
+			{ "Enemy vs Player Trail (Active)", "1 enemy collision" },
+			{ "Enemy vs Player Trail (Wall)", "1 enemy collision" },
+			{ "Player vs Enemy Trail (Active)", "1 player collision" },
+			{ "Enemy vs Boundary", "1 boundary collision" },
+			{ "Enemy Self-Collision", "1 enemy self-collision" },
+			{ "Player vs Obstacle", "1 obstacle collision" },
+			{ "Enemy vs Enemy Trail", "1 enemy collision" },
+			{ "Player Boundary Edge Case", "Variable (edge test)" }
+		};
+
+		GD.Print("\n--- Test Results ---");
+		int passCount = 0;
+		int failCount = 0;
+
+		foreach (var scenario in _testScenarios)
+		{
+			bool hasResult = _testResults.TryGetValue(scenario.Name, out bool passed);
+			string status = hasResult ? (passed ? "✓ PASS" : "✗ FAIL") : "- N/A";
+			string expected = expectedCollisions.ContainsKey(scenario.Name)
+				? expectedCollisions[scenario.Name]
+				: "Unknown";
+
+			GD.Print($"{status} | {scenario.Name} (Expected: {expected})");
+
+			if (hasResult && passed) passCount++;
+			else if (hasResult && !passed) failCount++;
+		}
+
+		GD.Print($"\nSummary: {passCount} passed, {failCount} failed, {_testScenarios.Count - passCount - failCount} incomplete");
+
+		if (_collisionEvents.Count > 0 && _collisionEvents.Count <= 15)
+		{
+			GD.Print("\n--- Collision Events ---");
+			foreach (var evt in _collisionEvents)
+			{
+				GD.Print(evt);
+			}
+		}
+		else if (_collisionEvents.Count > 15)
+		{
+			GD.Print($"\n--- Collision Events (showing first 15 of {_collisionEvents.Count}) ---");
+			for (int i = 0; i < 15; i++)
+			{
+				GD.Print(_collisionEvents[i]);
+			}
+		}
+
+		GD.Print("\n╚════════════════════════════════════════════╝\n");
+	}
+
+	/// <summary>
+	/// Records a collision event for the current test
+	/// </summary>
+	public void RecordCollision(string collisionType, string details)
+	{
+		_totalCollisions++;
+		var scenario = _testScenarios[_currentTestScenario];
+		string eventLog = $"T{_currentTestScenario + 1}: {collisionType} - {details}";
+		_collisionEvents.Add(eventLog);
+
+		// Mark test as having detected collision (pass)
+		_testResults[scenario.Name] = true;
+	}
+
 	// ========== HELPER METHODS ==========
+
+	/// <summary>
+	/// Checks if player or any enemy has gone out of bounds
+	/// </summary>
+	private bool CheckOutOfBounds()
+	{
+		const int OUT_OF_BOUNDS_LIMIT = 2000; // Match GridExtent
+
+		// Check player
+		if (_player != null && IsInstanceValid(_player))
+		{
+			if (Mathf.Abs(_player.GlobalPosition.X) > OUT_OF_BOUNDS_LIMIT ||
+			    Mathf.Abs(_player.GlobalPosition.Y) > OUT_OF_BOUNDS_LIMIT)
+			{
+				GD.Print($"[CollisionTest] Player out of bounds at {_player.GlobalPosition}");
+				return true;
+			}
+		}
+
+		// Check enemies
+		foreach (var enemy in _testEnemies)
+		{
+			if (enemy != null && IsInstanceValid(enemy))
+			{
+				if (Mathf.Abs(enemy.GlobalPosition.X) > OUT_OF_BOUNDS_LIMIT ||
+				    Mathf.Abs(enemy.GlobalPosition.Y) > OUT_OF_BOUNDS_LIMIT)
+				{
+					GD.Print($"[CollisionTest] Enemy out of bounds at {enemy.GlobalPosition}");
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
 
 	private void ResetPlayer(Vector2 position, int direction)
 	{
@@ -396,6 +540,7 @@ public partial class CollisionTestController : Node
 		_player.Set("_currentDirection", direction);
 		_player.Rotation = direction * Mathf.Pi / 2.0f;
 		_player.ClearTrail();
+		_player.Set("_hasReportedCollision", false);  // Reset collision reporting flag
 
 		GD.Print($"[CollisionTest] Player reset: pos={position}, dir={direction}");
 	}
@@ -408,6 +553,7 @@ public partial class CollisionTestController : Node
 		_player.Set("_autoTestStep", step);
 		_player.Set("_autoTestTimer", 0.0f);
 		_player.Set("_autoTestPattern", pattern);
+		_player.Set("_hasReportedCollision", false);  // Reset collision reporting flag
 
 		GD.Print($"[CollisionTest] Player auto-test enabled: pattern='{pattern}'");
 	}

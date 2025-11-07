@@ -44,6 +44,7 @@ public partial class EnemyCycle : GridCycle
 	private int _autoTestStep = 0;
 	private string _autoTestPattern = "move_straight";
 	private bool _collisionTestMode = false;  // When true, log collisions but don't die
+	private bool _hasReportedCollision = false;  // Track if we've already reported a collision in test mode
 
 	// ========== INITIALIZATION ==========
 	public override void _Ready()
@@ -347,7 +348,12 @@ public partial class EnemyCycle : GridCycle
 
 			if (_collisionTestMode)
 			{
-				GD.Print($"[Enemy] 🧪 TEST MODE COLLISION: Would have died hitting {occupant} at {checkPosition}");
+				if (!_hasReportedCollision)
+				{
+					GD.Print($"[Enemy] 🧪 TEST MODE COLLISION: Would have died hitting {occupant} at {checkPosition}");
+					CollisionTestController.Instance?.RecordCollision("Enemy Collision", $"Hit {occupant}");
+					_hasReportedCollision = true;
+				}
 			}
 			else
 			{
@@ -366,7 +372,12 @@ public partial class EnemyCycle : GridCycle
 		{
 			if (_collisionTestMode)
 			{
-				GD.Print($"[EnemyCycle] 🧪 TEST MODE: Would have died leaving arena boundary at {GlobalPosition}");
+				if (!_hasReportedCollision)
+				{
+					GD.Print($"[EnemyCycle] 🧪 TEST MODE: Would have died leaving arena boundary at {GlobalPosition}");
+					CollisionTestController.Instance?.RecordCollision("Enemy Boundary", "Left arena boundary");
+					_hasReportedCollision = true;
+				}
 			}
 			else
 			{
