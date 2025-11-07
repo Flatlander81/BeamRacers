@@ -7,7 +7,14 @@ using Godot;
 public abstract partial class GridCycle : CharacterBody2D
 {
 	// ========== GRID PARAMETERS ==========
-	public int GridSize => GridCollisionManager.Instance?.GetGridSize() ?? 50;
+
+	/// <summary>
+	/// Gets the current grid size from GridCollisionManager
+	/// </summary>
+	public int GetGridSize()
+	{
+		return GridCollisionManager.Instance?.GetGridSize() ?? 50;
+	}
 
 	// ========== MOVEMENT STATE ==========
 	protected int _currentDirection = 0; // 0=right, 1=down, 2=left, 3=up
@@ -20,15 +27,16 @@ public abstract partial class GridCycle : CharacterBody2D
 	/// </summary>
 	protected bool IsAlignedToGrid()
 	{
+		int gridSize = GetGridSize();
 		if (_currentDirection == 0 || _currentDirection == 2) // Horizontal
 		{
-			float remainder = Mathf.Abs(GlobalPosition.X) % GridSize;
-			return remainder < 2.0f || remainder > (GridSize - 2.0f);
+			float remainder = Mathf.Abs(GlobalPosition.X) % gridSize;
+			return remainder < 2.0f || remainder > (gridSize - 2.0f);
 		}
 		else // Vertical
 		{
-			float remainder = Mathf.Abs(GlobalPosition.Y) % GridSize;
-			return remainder < 2.0f || remainder > (GridSize - 2.0f);
+			float remainder = Mathf.Abs(GlobalPosition.Y) % gridSize;
+			return remainder < 2.0f || remainder > (gridSize - 2.0f);
 		}
 	}
 
@@ -37,9 +45,10 @@ public abstract partial class GridCycle : CharacterBody2D
 	/// </summary>
 	protected void SnapToGrid()
 	{
+		int gridSize = GetGridSize();
 		Vector2 snappedPos = GlobalPosition;
-		snappedPos.X = Mathf.Round(snappedPos.X / GridSize) * GridSize;
-		snappedPos.Y = Mathf.Round(snappedPos.Y / GridSize) * GridSize;
+		snappedPos.X = Mathf.Round(snappedPos.X / gridSize) * gridSize;
+		snappedPos.Y = Mathf.Round(snappedPos.Y / gridSize) * gridSize;
 		GlobalPosition = snappedPos;
 	}
 

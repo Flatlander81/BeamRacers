@@ -326,7 +326,6 @@ public partial class Main : Node2D
 		_player.Position = Vector2.Zero;
 
 		// Set grid parameters for grid-snapped turning and boundary detection
-		_player.GridSize = GridSize;
 		_player.GridExtent = GridExtent;
 
 		// Add to game layer
@@ -487,12 +486,8 @@ public partial class Main : Node2D
 					GD.Print("[Main] ⚡ F6 pressed - Generating PROCEDURAL arena (random)");
 					break;
 				case Key.F7:
-					GD.Print("[Main] ⚡ F7 pressed - Initializing COLLISION TEST MODE (no rotation)");
-					ResetForCollisionTest(forceNoRotation: true);
-					break;
-				case Key.F8:
-					GD.Print("[Main] ⚡ F8 pressed - Initializing COLLISION TEST MODE (WITH rotation)");
-					ResetForCollisionTest(forceNoRotation: false);
+					GD.Print("[Main] ⚡ F7 pressed - Initializing COLLISION TEST MODE");
+					ResetForCollisionTest();
 					break;
 			}
 		}
@@ -501,8 +496,7 @@ public partial class Main : Node2D
 	/// <summary>
 	/// Resets game state for collision testing
 	/// </summary>
-	/// <param name="forceNoRotation">If true, disables arena rotation for predictable test layout</param>
-	private void ResetForCollisionTest(bool forceNoRotation = true)
+	private void ResetForCollisionTest()
 	{
 		GD.Print("\n[Main] ════════════ RESETTING FOR COLLISION TEST ════════════");
 
@@ -545,9 +539,8 @@ public partial class Main : Node2D
 		// 4. Load collision test arena
 		if (_arena != null)
 		{
-			_arena.GenerateArenaByTemplate(5, sizeScale: 1.0f, forceNoRotation);
-			string rotationStatus = forceNoRotation ? "(rotation disabled)" : "(rotation enabled)";
-			GD.Print($"[Main] ✓ Loaded Collision Test Arena {rotationStatus}");
+			_arena.GenerateArenaByTemplate(5);
+			GD.Print("[Main] ✓ Loaded Collision Test Arena");
 		}
 
 		// 5. Start automated test suite

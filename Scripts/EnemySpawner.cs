@@ -97,7 +97,6 @@ public partial class EnemySpawner : Node
 			EnemyCycle enemy = _enemyCycleScene.Instantiate<EnemyCycle>();
 			enemy.GlobalPosition = spawnPos;
 			enemy.MoveSpeed = enemySpeed;
-			enemy.GridSize = gridSize;
 			enemy.ArenaBounds = arenaBounds;
 
 			// Connect to death signal

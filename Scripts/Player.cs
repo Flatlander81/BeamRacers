@@ -156,7 +156,7 @@ public partial class Player : GridCycle
 		// Check the cell ahead of us in our movement direction, not our current cell
 		// This prevents hitting our own currently-drawing trail while allowing others to hit it
 		Vector2 directionVector = GetDirectionVector();
-		Vector2 checkPosition = GlobalPosition + directionVector * (GridSize / 2.0f);
+		Vector2 checkPosition = GlobalPosition + directionVector * (GetGridSize() / 2.0f);
 
 		CellOccupant occupant = GridCollisionManager.Instance.GetCell(checkPosition);
 
