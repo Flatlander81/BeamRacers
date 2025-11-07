@@ -22,6 +22,7 @@ public partial class CollisionTestController : Node
 	private Player _player;
 	private List<EnemyCycle> _testEnemies = new List<EnemyCycle>();
 	private Node2D _gameLayer;
+	private Arena _arena;
 
 	// ========== TEST SCENARIO DEFINITION ==========
 	private class TestScenario
@@ -259,6 +260,9 @@ public partial class CollisionTestController : Node
 		_currentTestScenario = 0;
 		_testTimer = 0.0f;
 
+		// Get arena reference for bounds
+		_arena = GetTree().Root.FindChild("Arena", true, false) as Arena;
+
 		// Enable collision test mode on player (logs collisions without dying)
 		if (_player != null)
 		{
@@ -426,6 +430,12 @@ public partial class CollisionTestController : Node
 		enemy.Set("_autoTestMode", true);
 		enemy.Set("_autoTestPattern", pattern);
 		enemy.Set("_collisionTestMode", true);  // Log collisions without dying
+
+		// Set arena bounds from current arena
+		if (_arena != null)
+		{
+			enemy.ArenaBounds = _arena.GetArenaBounds();
+		}
 
 		_gameLayer.AddChild(enemy);
 		_testEnemies.Add(enemy);
