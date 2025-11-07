@@ -45,6 +45,9 @@ public partial class EnemyCycle : GridCycle
 	private string _autoTestPattern = "move_straight";
 	private bool _collisionTestMode = false;  // When true, log collisions but don't die
 
+	// ========== COLLISION DEBOUNCING ==========
+	private Vector2I? _lastCollisionGridCell = null;  // Track last collision to prevent spam
+
 	// ========== INITIALIZATION ==========
 	public override void _Ready()
 	{
@@ -333,9 +336,9 @@ public partial class EnemyCycle : GridCycle
 		if (GridCollisionManager.Instance == null) return;
 
 		// Check the cell ahead of us in our movement direction, not our current cell
-		// This prevents hitting our own currently-drawing trail while allowing others to hit it
+		// Check a full grid cell ahead to avoid detecting our own currently-drawing trail
 		Vector2 directionVector = GetDirectionVector();
-		Vector2 checkPosition = GlobalPosition + directionVector * (GetGridSize() / 2.0f);
+		Vector2 checkPosition = GlobalPosition + directionVector * (GetGridSize() * 1.5f);
 
 		CellOccupant occupant = GridCollisionManager.Instance.GetCell(checkPosition);
 
@@ -343,17 +346,29 @@ public partial class EnemyCycle : GridCycle
 		if (occupant != CellOccupant.Empty)
 		{
 			Vector2I checkGrid = GridCollisionManager.Instance.WorldToGrid(checkPosition);
-			GD.Print($"[Enemy] ⚠ COLLISION DETECTED: {occupant} at {checkPosition} (grid {checkGrid})");
 
-			if (_collisionTestMode)
+			// Only log if this is a NEW collision (different grid cell)
+			bool isNewCollision = !_lastCollisionGridCell.HasValue || _lastCollisionGridCell.Value != checkGrid;
+			if (isNewCollision)
 			{
-				GD.Print($"[Enemy] 🧪 TEST MODE COLLISION: Would have died hitting {occupant} at {checkPosition}");
+				GD.Print($"[Enemy] ⚠ COLLISION DETECTED: {occupant} at {checkPosition} (grid {checkGrid})");
+				_lastCollisionGridCell = checkGrid;
+
+				if (_collisionTestMode)
+				{
+					GD.Print($"[Enemy] 🧪 TEST MODE COLLISION: Would have died hitting {occupant} at {checkPosition}");
+				}
+				else
+				{
+					GD.Print($"[Enemy] ☠ DEATH: Hit {occupant} at {checkPosition}");
+					Die();
+				}
 			}
-			else
-			{
-				GD.Print($"[Enemy] ☠ DEATH: Hit {occupant} at {checkPosition}");
-				Die();
-			}
+		}
+		else
+		{
+			// No collision - clear the collision tracking
+			_lastCollisionGridCell = null;
 		}
 	}
 

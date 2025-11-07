@@ -43,6 +43,9 @@ public partial class Player : GridCycle
 	private string _autoTestPattern = "rapid_double_turn";
 	private bool _collisionTestMode = false;  // When true, log collisions but don't die
 
+	// ========== COLLISION DEBOUNCING ==========
+	private Vector2I? _lastCollisionGridCell = null;  // Track last collision to prevent spam
+
 	// ========== INITIALIZATION ==========
 	public override void _Ready()
 	{
@@ -154,9 +157,9 @@ public partial class Player : GridCycle
 		if (!_inputEnabled || GridCollisionManager.Instance == null) return;
 
 		// Check the cell ahead of us in our movement direction, not our current cell
-		// This prevents hitting our own currently-drawing trail while allowing others to hit it
+		// Check a full grid cell ahead to avoid detecting our own currently-drawing trail
 		Vector2 directionVector = GetDirectionVector();
-		Vector2 checkPosition = GlobalPosition + directionVector * (GetGridSize() / 2.0f);
+		Vector2 checkPosition = GlobalPosition + directionVector * (GetGridSize() * 1.5f);
 
 		CellOccupant occupant = GridCollisionManager.Instance.GetCell(checkPosition);
 
@@ -164,12 +167,19 @@ public partial class Player : GridCycle
 		if (occupant != CellOccupant.Empty)
 		{
 			Vector2I checkGrid = GridCollisionManager.Instance.WorldToGrid(checkPosition);
-			GD.Print($"[Player] ⚠ COLLISION DETECTED: {occupant} at {checkPosition} (grid {checkGrid})");
+
+			// Only log if this is a NEW collision (different grid cell)
+			bool isNewCollision = !_lastCollisionGridCell.HasValue || _lastCollisionGridCell.Value != checkGrid;
+			if (isNewCollision)
+			{
+				GD.Print($"[Player] ⚠ COLLISION DETECTED: {occupant} at {checkPosition} (grid {checkGrid})");
+				_lastCollisionGridCell = checkGrid;
+			}
 
 			// Handle shield absorption
 			if (occupant == CellOccupant.PlayerTrail && _shieldState == ShieldState.Active)
 			{
-				if (!_shieldBrokeTrailThisActivation)
+				if (!_shieldBrokeTrailThisActivation && isNewCollision)
 				{
 					GD.Print($"[Player] 🛡 Shield absorbing collision with PlayerTrail");
 					TrailManager.Instance?.BreakClosestWall(GlobalPosition, this);
@@ -180,15 +190,23 @@ public partial class Player : GridCycle
 			}
 
 			// Otherwise, player dies (or just logs in test mode)
-			if (_collisionTestMode)
+			if (isNewCollision)
 			{
-				GD.Print($"[Player] 🧪 TEST MODE COLLISION: Would have died hitting {occupant} at {checkPosition} (grid {checkGrid})");
+				if (_collisionTestMode)
+				{
+					GD.Print($"[Player] 🧪 TEST MODE COLLISION: Would have died hitting {occupant} at {checkPosition} (grid {checkGrid})");
+				}
+				else
+				{
+					GD.Print($"[Player] ☠ DEATH: Hit {occupant} at {checkPosition} (grid {checkGrid})");
+					Die();
+				}
 			}
-			else
-			{
-				GD.Print($"[Player] ☠ DEATH: Hit {occupant} at {checkPosition} (grid {checkGrid})");
-				Die();
-			}
+		}
+		else
+		{
+			// No collision - clear the collision tracking
+			_lastCollisionGridCell = null;
 		}
 	}
 
