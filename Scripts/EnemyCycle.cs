@@ -27,16 +27,16 @@ public partial class EnemyCycle : GridCycle
 	// ========== AI STATE ==========
 	private Vector2 _targetPosition = Vector2.Zero;
 	private float _targetUpdateTimer = 0.0f;
-	private const float TARGET_UPDATE_INTERVAL = 0.2f;
+	[Export] public float TargetUpdateInterval = 0.2f;
 	private Player _player;
 	private float _nextDecisionTime = 0.0f;
-	private const float DECISION_INTERVAL = 0.3f;
+	[Export] public float DecisionInterval = 0.3f;
 
 	// ========== DEATH STATE ==========
 	private bool _isDead = false;
 
 	// ========== TRAIL AVOIDANCE ==========
-	private const float AVOIDANCE_CHECK_DISTANCE = 150.0f;
+	[Export] public float AvoidanceCheckDistance = 150.0f;
 
 	// ========== AUTOMATED TEST MODE ==========
 	private bool _autoTestMode = false;
@@ -140,7 +140,7 @@ public partial class EnemyCycle : GridCycle
 	{
 		_targetUpdateTimer += delta;
 
-		if (_targetUpdateTimer >= TARGET_UPDATE_INTERVAL)
+		if (_targetUpdateTimer >= TargetUpdateInterval)
 		{
 			_targetUpdateTimer = 0.0f;
 
@@ -169,7 +169,7 @@ public partial class EnemyCycle : GridCycle
 		float currentTime = Time.GetTicksMsec() / 1000.0f;
 		if (currentTime < _nextDecisionTime) return;
 
-		_nextDecisionTime = currentTime + DECISION_INTERVAL;
+		_nextDecisionTime = currentTime + DecisionInterval;
 
 		// Don't queue another turn if one is already queued
 		if (_queuedDirection.HasValue) return;
@@ -291,7 +291,7 @@ public partial class EnemyCycle : GridCycle
 		var spaceState = GetWorld2D().DirectSpaceState;
 		var query = PhysicsRayQueryParameters2D.Create(
 			GlobalPosition,
-			GlobalPosition + direction * AVOIDANCE_CHECK_DISTANCE
+			GlobalPosition + direction * AvoidanceCheckDistance
 		);
 		query.CollisionMask = 6; // Layers 2 (trails) + 3 (boundaries/obstacles)
 		query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };

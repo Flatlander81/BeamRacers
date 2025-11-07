@@ -71,12 +71,19 @@ public partial class Arena : Node2D
 	// Random generator
 	private Random _random = new Random();
 
+	// Procedural Generation Settings
+	[Export] public float SafeZoneRadius = 200f;  // Clear area around spawn point
+	[Export] public float MinObstacleDistance = 120f;  // Minimum distance between obstacles
+	[Export] public float SafeBoundaryMargin = 380f;  // Stay within boundaries to survive rotation
+	[Export] public int MinObstacles = 8;
+	[Export] public int MaxObstacles = 15;
+
 	// Constants
 	private const int PILLAR_VERTICES = 16;
 	private static readonly Color BOUNDARY_COLOR = new Color(0, 0.5f, 1, 1);  // Blue
 	private const float BOUNDARY_WIDTH = 2.0f;
 	private static readonly Color GRID_COLOR = new Color(0, 0.3f, 0.5f, 0.15f);  // Subtle blue
-	private const float GRID_SPACING = 50.0f;
+	private float GridSpacing => GridCollisionManager.Instance?.GetGridSize() ?? 50;
 
 	public override void _Ready()
 	{
@@ -351,8 +358,7 @@ public partial class Arena : Node2D
 	/// </summary>
 	/// <param name="templateIndex">Template index (0-4): 0=The Box, 1=Four Pillars, 2=The Cross, 3=The Ring, 4=Scattered</param>
 	/// <param name="sizeScale">Scale factor for arena size (default 1.0)</param>
-	/// <param name="forceNoRotation">If true, disables random arena rotation (default false)</param>
-	public void GenerateArenaByTemplate(int templateIndex, float sizeScale = 1.0f, bool forceNoRotation = false)
+	public void GenerateArenaByTemplate(int templateIndex, float sizeScale = 1.0f)
 	{
 		// Validate template index
 		if (templateIndex < 0 || templateIndex >= _templates.Count)
@@ -367,7 +373,7 @@ public partial class Arena : Node2D
 		ArenaTemplate selectedTemplate = _templates[templateIndex];
 
 		// Generate arena with selected template
-		GenerateArenaFromTemplate(selectedTemplate, sizeScale, forceNoRotation);
+		GenerateArenaFromTemplate(selectedTemplate, sizeScale);
 	}
 
 	/// <summary>
@@ -375,8 +381,7 @@ public partial class Arena : Node2D
 	/// </summary>
 	/// <param name="selectedTemplate">The arena template to generate</param>
 	/// <param name="sizeScale">Scale factor for arena size</param>
-	/// <param name="forceNoRotation">If true, disables random arena rotation</param>
-	private void GenerateArenaFromTemplate(ArenaTemplate selectedTemplate, float sizeScale, bool forceNoRotation = false)
+	private void GenerateArenaFromTemplate(ArenaTemplate selectedTemplate, float sizeScale)
 	{
 		// Clear existing obstacles
 		ClearObstacles();
@@ -384,9 +389,9 @@ public partial class Arena : Node2D
 		// Store current template
 		_currentTemplate = selectedTemplate;
 
-		// Apply random rotation (0°, 90°, 180°, 270°) - can be disabled via parameter
+		// Apply random rotation (0°, 90°, 180°, 270°) - SKIP for collision test arena
 		float arenaRotation = 0f;
-		if (!forceNoRotation)
+		if (selectedTemplate.Name != "Collision Test Arena")
 		{
 			float[] possibleRotations = { 0, Mathf.Pi / 2, Mathf.Pi, 3 * Mathf.Pi / 2 };
 			arenaRotation = possibleRotations[_random.Next(possibleRotations.Length)];
@@ -444,15 +449,8 @@ public partial class Arena : Node2D
 		// Generate boundaries
 		GenerateBoundaries(scaledSize);
 
-		// Procedural generation parameters
-		const float SAFE_ZONE_RADIUS = 200f;  // Clear area around spawn point (0,0)
-		const float MIN_OBSTACLE_DISTANCE = 120f;  // Minimum distance between obstacles
-		const float SAFE_BOUNDARY_MARGIN = 380f;  // Stay within ±380 to survive rotation
-		const int MIN_OBSTACLES = 8;
-		const int MAX_OBSTACLES = 15;
-
-		// Decide how many obstacles to spawn
-		int obstacleCount = procRandom.Next(MIN_OBSTACLES, MAX_OBSTACLES + 1);
+		// Decide how many obstacles to spawn (using exported settings)
+		int obstacleCount = procRandom.Next(MinObstacles, MaxObstacles + 1);
 		GD.Print($"[Arena] Generating {obstacleCount} procedural obstacles...");
 
 		// Track placed obstacle positions for spacing validation
@@ -470,12 +468,12 @@ public partial class Arena : Node2D
 			bool isWall = procRandom.NextDouble() < 0.6;
 
 			// Generate random position within safe zone
-			float x = (float)(procRandom.NextDouble() * 2 - 1) * SAFE_BOUNDARY_MARGIN;
-			float y = (float)(procRandom.NextDouble() * 2 - 1) * SAFE_BOUNDARY_MARGIN;
+			float x = (float)(procRandom.NextDouble() * 2 - 1) * SafeBoundaryMargin;
+			float y = (float)(procRandom.NextDouble() * 2 - 1) * SafeBoundaryMargin;
 			Vector2 position = new Vector2(x, y);
 
 			// Check if too close to spawn point
-			if (position.Length() < SAFE_ZONE_RADIUS)
+			if (position.Length() < SafeZoneRadius)
 			{
 				continue;  // Too close to spawn, skip
 			}
@@ -484,7 +482,7 @@ public partial class Arena : Node2D
 			bool tooClose = false;
 			foreach (var existingPos in placedPositions)
 			{
-				if (position.DistanceTo(existingPos) < MIN_OBSTACLE_DISTANCE)
+				if (position.DistanceTo(existingPos) < MinObstacleDistance)
 				{
 					tooClose = true;
 					break;
@@ -625,7 +623,7 @@ public partial class Arena : Node2D
 		float halfHeight = scaledSize.Y / 2;
 
 		// Vertical lines
-		for (float x = -halfWidth; x <= halfWidth; x += GRID_SPACING)
+		for (float x = -halfWidth; x <= halfWidth; x += GridSpacing)
 		{
 			DrawLine(
 				new Vector2(x, -halfHeight),
@@ -636,7 +634,7 @@ public partial class Arena : Node2D
 		}
 
 		// Horizontal lines
-		for (float y = -halfHeight; y <= halfHeight; y += GRID_SPACING)
+		for (float y = -halfHeight; y <= halfHeight; y += GridSpacing)
 		{
 			DrawLine(
 				new Vector2(-halfWidth, y),

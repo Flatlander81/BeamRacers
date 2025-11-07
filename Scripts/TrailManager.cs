@@ -30,7 +30,7 @@ public partial class TrailManager : Node2D
 	private Dictionary<Node2D, CycleTrailData> _cycleTrails = new Dictionary<Node2D, CycleTrailData>();
 
 	// ========== CONSTANTS ==========
-	private const float TRAIL_VISUAL_WIDTH = 4.0f;
+	[Export] public float TrailVisualWidth = 4.0f;
 
 	// ========== INITIALIZATION ==========
 	public override void _EnterTree()
@@ -252,7 +252,7 @@ public partial class TrailManager : Node2D
 		var line = new Line2D();
 		line.Points = new Vector2[] { wall.Start, wall.End };
 		line.DefaultColor = color;
-		line.Width = TRAIL_VISUAL_WIDTH;
+		line.Width = TrailVisualWidth;
 
 		var material = new CanvasItemMaterial();
 		material.BlendMode = CanvasItemMaterial.BlendModeEnum.Add;
